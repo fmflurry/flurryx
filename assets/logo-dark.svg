@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160" fill="none">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#dd0031;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#c3002f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ff4d6a;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#ff4d6a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#dd0031;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Signal wave icon -->
+  <g transform="translate(28, 42)">
+    <!-- Outer wave -->
+    <path d="M12 70 Q20 10, 35 38 Q50 66, 58 20 Q66 -10, 76 38"
+          stroke="url(#grad)" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.3"/>
+    <!-- Middle wave -->
+    <path d="M20 65 Q28 20, 40 40 Q52 60, 60 25 Q68 5, 72 40"
+          stroke="url(#grad)" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.6"/>
+    <!-- Inner wave / signal pulse -->
+    <path d="M28 58 Q34 28, 44 42 Q54 56, 60 30"
+          stroke="url(#grad)" stroke-width="5.5" stroke-linecap="round" fill="none" filter="url(#glow)"/>
+    <!-- Dot -->
+    <circle cx="46" cy="42" r="5" fill="url(#grad)" filter="url(#glow)"/>
+  </g>
+
+  <!-- "flurry" text -->
+  <text x="120" y="105"
+        font-family="'SF Pro Display', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif"
+        font-size="72"
+        font-weight="300"
+        letter-spacing="-2"
+        fill="#e0e0e0">flurry</text>
+
+  <!-- "x" text with gradient -->
+  <text x="418" y="105"
+        font-family="'SF Pro Display', 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif"
+        font-size="72"
+        font-weight="700"
+        letter-spacing="-2"
+        fill="url(#grad)">x</text>
+
+  <!-- Tagline -->
+  <text x="122" y="132"
+        font-family="'SF Mono', 'JetBrains Mono', 'Fira Code', monospace"
+        font-size="13"
+        font-weight="400"
+        letter-spacing="3.5"
+        fill="#777777">SIGNAL-FIRST REACTIVE STATE</text>
+</svg>

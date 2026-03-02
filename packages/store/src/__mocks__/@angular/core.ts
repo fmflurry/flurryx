@@ -19,3 +19,13 @@ export function signal<T>(initialValue: T): WritableSignal<T> {
 
   return getter;
 }
+
+export class InjectionToken<T> {
+  constructor(
+    public readonly description: string,
+    public readonly options?: {
+      providedIn: string;
+      factory: () => T;
+    }
+  ) {}
+}

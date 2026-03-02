@@ -6,17 +6,17 @@ export type {
   KeyedResourceKey,
   ResourceStatus,
   ResourceErrors,
-} from '@flurryx/core';
+} from "@flurryx/core";
 export {
   isKeyedResourceData,
   createKeyedResourceData,
   isAnyKeyLoading,
   CACHE_NO_TIMEOUT,
   DEFAULT_CACHE_TTL_MS,
-} from '@flurryx/core';
+} from "@flurryx/core";
 
 // @flurryx/store
-export { BaseStore } from '@flurryx/store';
+export { BaseStore, Store } from "@flurryx/store";
 
 // @flurryx/rx
 export {
@@ -25,9 +25,9 @@ export {
   SkipIfCached,
   Loading,
   defaultErrorNormalizer,
-} from '@flurryx/rx';
+} from "@flurryx/rx";
 export type {
   SyncToStoreOptions,
   SyncToKeyedStoreOptions,
   ErrorNormalizer,
-} from '@flurryx/rx';
+} from "@flurryx/rx";

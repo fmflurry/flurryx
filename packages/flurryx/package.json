@@ -1,6 +1,6 @@
 {
   "name": "flurryx",
-  "version": "0.0.1",
+  "version": "0.0.3",
   "description": "Signal-first reactive state management for Angular",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,9 @@
       }
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit"

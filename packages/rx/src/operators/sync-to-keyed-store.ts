@@ -1,5 +1,5 @@
 import { finalize, Observable, take, tap } from "rxjs";
-import { BaseStore } from "@flurryx/store";
+import type { IStore } from "@flurryx/store";
 import {
   createKeyedResourceData,
   isAnyKeyLoading,
@@ -32,21 +32,13 @@ function withoutKey<TKey extends KeyedResourceKey, TValue>(
 }
 
 export function syncToKeyedStore<
-  TEnum extends Record<string, string | number>,
-  TStoreKey extends keyof TEnum,
+  TData extends Record<string, ResourceState<unknown>>,
+  TStoreKey extends keyof TData & string,
   TKey extends KeyedResourceKey,
   TValue,
-  R = TValue,
-  TState extends ResourceState<KeyedResourceData<TKey, TValue>> = ResourceState<
-    KeyedResourceData<TKey, TValue>
-  >,
-  TData extends {
-    [K in keyof TEnum]: ResourceState<unknown>;
-  } & { [K in TStoreKey]: TState } = {
-    [K in keyof TEnum]: ResourceState<unknown>;
-  } & { [K in TStoreKey]: TState }
+  R = TValue
 >(
-  store: BaseStore<TEnum, TData>,
+  store: IStore<TData>,
   storeKey: TStoreKey,
   resourceKey: TKey,
   options: SyncToKeyedStoreOptions<R, TValue> = {
@@ -67,7 +59,9 @@ export function syncToKeyedStore<
 
           const storeSignal = store.get(storeKey);
           const state = storeSignal();
-          const data = state.data ?? createKeyedResourceData<TKey, TValue>();
+          const data =
+            (state.data as KeyedResourceData<TKey, TValue> | undefined) ??
+            createKeyedResourceData<TKey, TValue>();
 
           const nextIsLoading = {
             ...data.isLoading,
@@ -100,7 +94,9 @@ export function syncToKeyedStore<
         error: (error: unknown) => {
           const storeSignal = store.get(storeKey);
           const state = storeSignal();
-          const data = state.data ?? createKeyedResourceData<TKey, TValue>();
+          const data =
+            (state.data as KeyedResourceData<TKey, TValue> | undefined) ??
+            createKeyedResourceData<TKey, TValue>();
 
           const nextIsLoading = {
             ...data.isLoading,

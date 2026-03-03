@@ -65,6 +65,9 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
   - [Error Normalization](#error-normalization)
   - [Constants](#constants)
 - [Keyed Resources](#keyed-resources)
+- [Store Mirroring](#store-mirroring)
+  - [mirrorKey](#mirrorkey)
+  - [collectKeyed](#collectkeyed)
 - [Design Decisions](#design-decisions)
 - [Contributing](#contributing)
 - [License](#license)
@@ -588,6 +591,143 @@ import {
   isKeyedResourceData, // type guard
   isAnyKeyLoading, // (loading: Record) => boolean
 } from "flurryx";
+```
+
+---
+
+## Store Mirroring
+
+When building session or aggregation stores that combine state from multiple feature stores, you typically need `onUpdate` listeners, cleanup arrays, and `DestroyRef` wiring. The `mirrorKey` and `collectKeyed` utilities reduce that to a single call.
+
+```typescript
+import { mirrorKey, collectKeyed } from "flurryx";
+```
+
+### mirrorKey
+
+Mirrors a resource key from one store to another. When the source updates, the target is updated with the same state.
+
+```typescript
+// Same key on both stores (default)
+mirrorKey(customersStore, 'CUSTOMERS', sessionStore);
+
+// Different keys
+mirrorKey(customersStore, 'ITEMS', sessionStore, 'ARTICLES');
+
+// Manual cleanup
+const cleanup = mirrorKey(customersStore, 'CUSTOMERS', sessionStore);
+cleanup(); // stop mirroring
+
+// Auto-cleanup with Angular DestroyRef
+mirrorKey(customersStore, 'CUSTOMERS', sessionStore, { destroyRef });
+mirrorKey(customersStore, 'ITEMS', sessionStore, 'ARTICLES', { destroyRef });
+```
+
+**Full example — session facade that aggregates feature stores:**
+
+```typescript
+// Feature stores
+interface CustomerStoreConfig {
+  CUSTOMERS: Customer[];
+}
+export const CustomerStore = Store.for<CustomerStoreConfig>().build();
+
+interface OrderStoreConfig {
+  ORDERS: Order[];
+}
+export const OrderStore = Store.for<OrderStoreConfig>().build();
+
+// Session store — mirrors state from feature stores
+interface SessionStoreConfig {
+  CUSTOMERS: Customer[];
+  ORDERS: Order[];
+}
+export const SessionStore = Store.for<SessionStoreConfig>().build();
+
+@Injectable({ providedIn: 'root' })
+export class SessionFacade {
+  private readonly customerStore = inject(CustomerStore);
+  private readonly orderStore = inject(OrderStore);
+  private readonly sessionStore = inject(SessionStore);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly customers = this.sessionStore.get('CUSTOMERS');
+  readonly orders = this.sessionStore.get('ORDERS');
+
+  constructor() {
+    mirrorKey(this.customerStore, 'CUSTOMERS', this.sessionStore, { destroyRef: this.destroyRef });
+    mirrorKey(this.orderStore, 'ORDERS', this.sessionStore, { destroyRef: this.destroyRef });
+  }
+}
+```
+
+Everything — loading flags, data, status, errors — is mirrored automatically. No manual `onUpdate` + cleanup boilerplate.
+
+### collectKeyed
+
+Accumulates single-entity fetches into a `KeyedResourceData` cache on a target store. Each time the source emits a successful entity, it is merged into the target's keyed map by a user-provided `extractId` function.
+
+```typescript
+// Same key on both stores
+collectKeyed(customerStore, 'CUSTOMER_DETAILS', sessionStore, {
+  extractId: (data) => data?.id,
+  destroyRef,
+});
+
+// Different keys
+collectKeyed(customerStore, 'CUSTOMER_DETAILS', sessionStore, 'CUSTOMER_CACHE', {
+  extractId: (data) => data?.id,
+  destroyRef,
+});
+```
+
+**What it does on each source update:**
+
+| Source state | Action |
+|---|---|
+| `status: 'Success'` + valid ID | Merges entity into target's keyed data |
+| `status: 'Error'` + valid ID | Records per-key error and status |
+| `isLoading: true` + valid ID | Sets per-key loading flag |
+| Data cleared (e.g. `source.clear()`) | Removes previous entity from target |
+
+**Full example — collect individual customer lookups into a cache:**
+
+```typescript
+// Feature store — fetches one customer at a time
+interface CustomerStoreConfig {
+  CUSTOMER_DETAILS: Customer;
+}
+export const CustomerStore = Store.for<CustomerStoreConfig>().build();
+
+// Session store — accumulates all fetched customers
+interface SessionStoreConfig {
+  CUSTOMER_CACHE: KeyedResourceData<string, Customer>;
+}
+export const SessionStore = Store.for<SessionStoreConfig>().build();
+
+@Injectable({ providedIn: 'root' })
+export class SessionFacade {
+  private readonly customerStore = inject(CustomerStore);
+  private readonly sessionStore = inject(SessionStore);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly customerCache = this.sessionStore.get('CUSTOMER_CACHE');
+
+  constructor() {
+    collectKeyed(this.customerStore, 'CUSTOMER_DETAILS', this.sessionStore, 'CUSTOMER_CACHE', {
+      extractId: (data) => data?.id,
+      destroyRef: this.destroyRef,
+    });
+  }
+
+  // After loading customers "c1" and "c2", the cache contains:
+  // {
+  //   entities: { c1: Customer, c2: Customer },
+  //   isLoading: { c1: false, c2: false },
+  //   status: { c1: 'Success', c2: 'Success' },
+  //   errors: {}
+  // }
+}
 ```
 
 ---

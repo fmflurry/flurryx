@@ -599,6 +599,23 @@ import {
 
 When building session or aggregation stores that combine state from multiple feature stores, you typically need `onUpdate` listeners, cleanup arrays, and `DestroyRef` wiring. The `mirrorKey` and `collectKeyed` utilities reduce that to a single call.
 
+```
+  ┌─────────────────┐
+  │  Feature Store A │──── mirrorKey ─────────┐
+  │  (CUSTOMERS)     │                        │
+  └─────────────────┘                        ▼
+                                    ┌──────────────────┐
+  ┌─────────────────┐               │  Session Store    │
+  │  Feature Store B │──── mirrorKey │  (aggregated)     │
+  │  (ORDERS)        │──────────────│                    │
+  └─────────────────┘               │  CUSTOMERS ✓      │
+                                    │  ORDERS ✓          │
+  ┌─────────────────┐               │  CUSTOMER_CACHE ✓  │
+  │  Feature Store C │── collectKeyed│  (KeyedResource)   │
+  │  (CUSTOMER_DETAIL)│─────────────│                    │
+  └─────────────────┘               └──────────────────┘
+```
+
 ```typescript
 import { mirrorKey, collectKeyed } from "flurryx";
 ```
@@ -606,6 +623,22 @@ import { mirrorKey, collectKeyed } from "flurryx";
 ### mirrorKey
 
 Mirrors a resource key from one store to another. When the source updates, the target is updated with the same state.
+
+```
+  ┌──────────────────┐         mirrorKey          ┌──────────────────┐
+  │  CustomerStore   │                             │   SessionStore   │
+  │                  │   onUpdate ──► update        │                  │
+  │  CUSTOMERS ──────┼────────────────────────────→│  CUSTOMERS       │
+  │  { data, status, │    (same key or different)  │  { data, status, │
+  │    isLoading }   │                             │    isLoading }   │
+  └──────────────────┘                             └──────────────────┘
+
+  source.update('CUSTOMERS', { data: [...], status: 'Success' })
+       │
+       └──► target is automatically updated with the same state
+```
+
+You wire it once. Every future update — data, loading, errors — flows automatically. Call the cleanup function or use `destroyRef` to stop.
 
 ```typescript
 // Same key on both stores (default)
@@ -666,6 +699,35 @@ Everything — loading flags, data, status, errors — is mirrored automatically
 ### collectKeyed
 
 Accumulates single-entity fetches into a `KeyedResourceData` cache on a target store. Each time the source emits a successful entity, it is merged into the target's keyed map by a user-provided `extractId` function.
+
+```
+  ┌──────────────────┐        collectKeyed         ┌──────────────────────────┐
+  │  CustomerStore   │                              │      SessionStore        │
+  │                  │   extractId(data) ──► key    │                          │
+  │  CUSTOMER_DETAILS│                              │  CUSTOMER_CACHE          │
+  │  (one at a time) │                              │  (KeyedResourceData)     │
+  └────────┬─────────┘                              │                          │
+           │                                        │  entities:               │
+           │  fetch("c1") ──► Success               │    c1: { id, name }     │
+           │  fetch("c2") ──► Success               │    c2: { id, name }     │
+           │  fetch("c3") ──► Error                 │    c3: undefined         │
+           │                                        │                          │
+           │  clear()     ──► removes last entity   │  isLoading:              │
+           │                                        │    c1: false, c2: false  │
+           │                                        │                          │
+           └────────────────────────────────────────│  status:                 │
+                                                    │    c1: 'Success'         │
+                                                    │    c2: 'Success'         │
+                                                    │    c3: 'Error'           │
+                                                    │                          │
+                                                    │  errors:                 │
+                                                    │    c3: [{ code, msg }]   │
+                                                    └──────────────────────────┘
+
+  Single-entity slot ──► accumulates into ──► per-key cache with independent tracking
+```
+
+Each entity is tracked independently — its own loading flag, status, and errors. The source store fetches one entity at a time; `collectKeyed` builds up the full cache on the target.
 
 ```typescript
 // Same key on both stores

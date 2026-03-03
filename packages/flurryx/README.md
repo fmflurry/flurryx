@@ -21,11 +21,12 @@
 flurryx bridges the gap between RxJS async operations and Angular signals. Define a store, pipe your HTTP calls through an operator, read signals in your templates. No actions, no reducers, no effects boilerplate.
 
 ```typescript
-// Store — declare your slots in 3 lines
-export const ProductStore = Store
-  .resource('LIST').as<Product[]>()
-  .resource('DETAIL').as<Product>()
-  .build();
+// Store — declare your slots with a single interface
+interface ProductStoreConfig {
+  LIST: Product[];
+  DETAIL: Product;
+}
+export const ProductStore = Store.for<ProductStoreConfig>().build();
 
 // Facade
 @SkipIfCached('LIST', (i) => i.store)
@@ -56,6 +57,7 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
 - [How to Use](#how-to-use)
   - [ResourceState](#resourcestate)
   - [Store API](#store-api)
+  - [Store Creation Styles](#store-creation-styles)
   - [syncToStore](#synctostore)
   - [syncToKeyedStore](#synctokeyedstore)
   - [@SkipIfCached](#skipifcached)
@@ -145,16 +147,51 @@ npm install @flurryx/core @flurryx/store @flurryx/rx
 
 Use the `Store` fluent builder to declare named slots. Each slot holds a `ResourceState<T>`.
 
+**Option A — Interface-based (recommended)**
+
+Define a TypeScript interface mapping keys to data types, pass it as a generic:
+
 ```typescript
 import { Store } from "flurryx";
 
+interface ProductStoreConfig {
+  LIST: Product[];
+  DETAIL: Product;
+}
+
+export const ProductStore = Store.for<ProductStoreConfig>().build();
+```
+
+No enum, no chaining, no class. The interface is type-only — zero runtime cost. Every call to `store.get('LIST')` returns `WritableSignal<ResourceState<Product[]>>`, and invalid keys or mismatched types are caught at compile time.
+
+**Option B — Fluent chaining**
+
+Declare each slot inline:
+
+```typescript
 export const ProductStore = Store
   .resource('LIST').as<Product[]>()
   .resource('DETAIL').as<Product>()
   .build();
 ```
 
-That's it. No enum, no interface, no class, no constructor. The builder returns an `InjectionToken` with `providedIn: 'root'`.
+**Option C — Enum-constrained**
+
+Bind the builder to an enum for compile-time key validation:
+
+```typescript
+const ProductStoreEnum = {
+  LIST: 'LIST',
+  DETAIL: 'DETAIL',
+} as const;
+
+export const ProductStore = Store.for(ProductStoreEnum)
+  .resource('LIST').as<Product[]>()
+  .resource('DETAIL').as<Product>()
+  .build();
+```
+
+All three options return an `InjectionToken` with `providedIn: 'root'`.
 
 ### Step 2 — Create a facade
 
@@ -252,10 +289,24 @@ A slot starts as `{ data: undefined, isLoading: false, status: undefined, errors
 
 ### Store API
 
-The `Store` builder creates a store backed by `WritableSignal<ResourceState>` per slot.
+The `Store` builder creates a store backed by `WritableSignal<ResourceState>` per slot. Three creation styles are available:
 
 ```typescript
+// 1. Interface-based (recommended) — type-safe with zero boilerplate
+interface MyStoreConfig {
+  USERS: User[];
+  SELECTED: User;
+}
+export const MyStore = Store.for<MyStoreConfig>().build();
+
+// 2. Fluent chaining — inline slot definitions
 export const MyStore = Store
+  .resource('USERS').as<User[]>()
+  .resource('SELECTED').as<User>()
+  .build();
+
+// 3. Enum-constrained — validates keys against a runtime enum
+export const MyStore = Store.for(MyStoreEnum)
   .resource('USERS').as<User[]>()
   .resource('SELECTED').as<User>()
   .build();
@@ -282,6 +333,69 @@ Once injected, the store exposes these methods:
 | `startKeyedLoading(key, resourceKey)`      | Sets loading for a single resource key |
 
 > Update hooks are stored in a `WeakMap` keyed by store instance, so garbage collection works naturally across multiple store lifetimes.
+
+### Store Creation Styles
+
+#### Interface-based: `Store.for<Config>().build()`
+
+The recommended approach. Define a TypeScript interface where keys are slot names and values are the data types:
+
+```typescript
+import { Store } from "flurryx";
+
+interface ChatStoreConfig {
+  SESSIONS: ChatSession[];
+  CURRENT_SESSION: ChatSession;
+  MESSAGES: ChatMessage[];
+}
+
+export const ChatStore = Store.for<ChatStoreConfig>().build();
+```
+
+The generic argument is type-only — there is no runtime enum or config object. Under the hood, the store lazily creates signals on first access, so un-accessed keys have zero overhead.
+
+Type safety is fully enforced:
+
+```typescript
+const store = inject(ChatStore);
+
+store.get('SESSIONS');                          // WritableSignal<ResourceState<ChatSession[]>>
+store.update('SESSIONS', { data: [session] });  // ✅ type-checked
+store.update('SESSIONS', { data: 42 });         // ❌ TS error — number is not ChatSession[]
+store.get('INVALID');                           // ❌ TS error — key does not exist
+```
+
+#### Fluent chaining: `Store.resource().as<T>().build()`
+
+Define slots inline without a separate interface:
+
+```typescript
+export const ChatStore = Store
+  .resource('SESSIONS').as<ChatSession[]>()
+  .resource('CURRENT_SESSION').as<ChatSession>()
+  .resource('MESSAGES').as<ChatMessage[]>()
+  .build();
+```
+
+#### Enum-constrained: `Store.for(enum).resource().as<T>().build()`
+
+When you have a runtime enum (e.g. shared with backend code), pass it to `.for()` to ensure every key is accounted for:
+
+```typescript
+const ChatStoreEnum = {
+  SESSIONS: 'SESSIONS',
+  CURRENT_SESSION: 'CURRENT_SESSION',
+  MESSAGES: 'MESSAGES',
+} as const;
+
+export const ChatStore = Store.for(ChatStoreEnum)
+  .resource('SESSIONS').as<ChatSession[]>()
+  .resource('CURRENT_SESSION').as<ChatSession>()
+  .resource('MESSAGES').as<ChatMessage[]>()
+  .build();
+```
+
+The builder only allows keys from the enum, and `.build()` is only available once all keys have been defined.
 
 ### syncToStore
 

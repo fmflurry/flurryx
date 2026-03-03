@@ -1,4 +1,5 @@
-import type { ResourceState } from '@flurryx/core';
+import type { WritableSignal } from "@angular/core";
+import type { ResourceState } from "@flurryx/core";
 
 /**
  * Phantom-typed marker for a store resource slot.
@@ -31,3 +32,30 @@ export type InferData<TConfig extends StoreConfig> = {
     TConfig[K] extends ResourceDef<infer T> ? T : never
   >;
 };
+
+/**
+ * Maps a plain config interface to ResourceState-wrapped data.
+ * e.g. { SESSIONS: ChatSession[] } -> { SESSIONS: ResourceState<ChatSession[]> }
+ */
+export type ConfigToData<TConfig extends Record<string, unknown>> = {
+  [K in keyof TConfig & string]: ResourceState<TConfig[K]>;
+};
+
+/**
+ * Shared store interface implemented by both BaseStore and LazyStore.
+ */
+export interface IStore<TData extends Record<string, ResourceState<unknown>>> {
+  get<K extends keyof TData & string>(key: K): WritableSignal<TData[K]>;
+  update<K extends keyof TData & string>(
+    key: K,
+    newState: Partial<TData[K]>
+  ): void;
+  clear<K extends keyof TData & string>(key: K): void;
+  clearAll(): void;
+  startLoading<K extends keyof TData & string>(key: K): void;
+  stopLoading<K extends keyof TData & string>(key: K): void;
+  onUpdate<K extends keyof TData & string>(
+    key: K,
+    callback: (state: TData[K], previousState: TData[K]) => void
+  ): () => void;
+}

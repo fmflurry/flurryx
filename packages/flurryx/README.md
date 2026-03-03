@@ -145,11 +145,7 @@ npm install @flurryx/core @flurryx/store @flurryx/rx
 
 ### Step 1 — Define your store
 
-Use the `Store` fluent builder to declare named slots. Each slot holds a `ResourceState<T>`.
-
-**Option A — Interface-based (recommended)**
-
-Define a TypeScript interface mapping keys to data types, pass it as a generic:
+Define a TypeScript interface mapping slot names to their data types, then pass it to the `Store` builder:
 
 ```typescript
 import { Store } from "flurryx";
@@ -162,36 +158,7 @@ interface ProductStoreConfig {
 export const ProductStore = Store.for<ProductStoreConfig>().build();
 ```
 
-No enum, no chaining, no class. The interface is type-only — zero runtime cost. Every call to `store.get('LIST')` returns `WritableSignal<ResourceState<Product[]>>`, and invalid keys or mismatched types are caught at compile time.
-
-**Option B — Fluent chaining**
-
-Declare each slot inline:
-
-```typescript
-export const ProductStore = Store
-  .resource('LIST').as<Product[]>()
-  .resource('DETAIL').as<Product>()
-  .build();
-```
-
-**Option C — Enum-constrained**
-
-Bind the builder to an enum for compile-time key validation:
-
-```typescript
-const ProductStoreEnum = {
-  LIST: 'LIST',
-  DETAIL: 'DETAIL',
-} as const;
-
-export const ProductStore = Store.for(ProductStoreEnum)
-  .resource('LIST').as<Product[]>()
-  .resource('DETAIL').as<Product>()
-  .build();
-```
-
-All three options return an `InjectionToken` with `providedIn: 'root'`.
+That's it. The interface is type-only — zero runtime cost. The builder returns an `InjectionToken` with `providedIn: 'root'`. Every call to `store.get('LIST')` returns `WritableSignal<ResourceState<Product[]>>`, and invalid keys or mismatched types are caught at compile time.
 
 ### Step 2 — Create a facade
 

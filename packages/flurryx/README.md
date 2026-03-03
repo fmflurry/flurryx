@@ -658,7 +658,7 @@ mirrorKey(customersStore, 'CUSTOMERS', sessionStore, { destroyRef });
 mirrorKey(customersStore, 'ITEMS', sessionStore, 'ARTICLES', { destroyRef });
 ```
 
-**Full example — session facade that aggregates feature stores:**
+**Full example — session store that aggregates feature stores:**
 
 ```typescript
 // Feature stores
@@ -677,21 +677,20 @@ interface SessionStoreConfig {
   CUSTOMERS: Customer[];
   ORDERS: Order[];
 }
-export const SessionStore = Store.for<SessionStoreConfig>().build();
 
 @Injectable({ providedIn: 'root' })
-export class SessionFacade {
+export class SessionStore {
   private readonly customerStore = inject(CustomerStore);
   private readonly orderStore = inject(OrderStore);
-  private readonly sessionStore = inject(SessionStore);
+  private readonly store = inject(Store.for<SessionStoreConfig>().build());
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly customers = this.sessionStore.get('CUSTOMERS');
-  readonly orders = this.sessionStore.get('ORDERS');
+  readonly customers = this.store.get('CUSTOMERS');
+  readonly orders = this.store.get('ORDERS');
 
   constructor() {
-    mirrorKey(this.customerStore, 'CUSTOMERS', this.sessionStore, { destroyRef: this.destroyRef });
-    mirrorKey(this.orderStore, 'ORDERS', this.sessionStore, { destroyRef: this.destroyRef });
+    mirrorKey(this.customerStore, 'CUSTOMERS', this.store, { destroyRef: this.destroyRef });
+    mirrorKey(this.orderStore, 'ORDERS', this.store, { destroyRef: this.destroyRef });
   }
 }
 ```
@@ -765,18 +764,17 @@ export const CustomerStore = Store.for<CustomerStoreConfig>().build();
 interface SessionStoreConfig {
   CUSTOMER_CACHE: KeyedResourceData<string, Customer>;
 }
-export const SessionStore = Store.for<SessionStoreConfig>().build();
 
 @Injectable({ providedIn: 'root' })
-export class SessionFacade {
+export class SessionStore {
   private readonly customerStore = inject(CustomerStore);
-  private readonly sessionStore = inject(SessionStore);
+  private readonly store = inject(Store.for<SessionStoreConfig>().build());
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly customerCache = this.sessionStore.get('CUSTOMER_CACHE');
+  readonly customerCache = this.store.get('CUSTOMER_CACHE');
 
   constructor() {
-    collectKeyed(this.customerStore, 'CUSTOMER_DETAILS', this.sessionStore, 'CUSTOMER_CACHE', {
+    collectKeyed(this.customerStore, 'CUSTOMER_DETAILS', this.store, 'CUSTOMER_CACHE', {
       extractId: (data) => data?.id,
       destroyRef: this.destroyRef,
     });

@@ -21,12 +21,19 @@
 flurryx bridges the gap between RxJS async operations and Angular signals. Define a store, pipe your HTTP calls through an operator, read signals in your templates. No actions, no reducers, no effects boilerplate.
 
 ```typescript
+// Store — declare your slots with a single interface
+interface ProductStoreConfig {
+  LIST: Product[];
+  DETAIL: Product;
+}
+export const ProductStore = Store.for<ProductStoreConfig>().build();
+
 // Facade
-@SkipIfCached(StoreKey.LIST, (i) => i.store)
-@Loading(StoreKey.LIST, (i) => i.store)
+@SkipIfCached('LIST', (i) => i.store)
+@Loading('LIST', (i) => i.store)
 loadProducts() {
   this.http.get<Product[]>('/api/products')
-    .pipe(syncToStore(this.store, StoreKey.LIST))
+    .pipe(syncToStore(this.store, 'LIST'))
     .subscribe();
 }
 
@@ -49,7 +56,8 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
 - [Getting Started](#getting-started)
 - [How to Use](#how-to-use)
   - [ResourceState](#resourcestate)
-  - [BaseStore API](#basestore-api)
+  - [Store API](#store-api)
+  - [Store Creation Styles](#store-creation-styles)
   - [syncToStore](#synctostore)
   - [syncToKeyedStore](#synctokeyedstore)
   - [@SkipIfCached](#skipifcached)
@@ -75,7 +83,7 @@ Angular signals are great for synchronous reactivity, but real applications stil
 | Duplicate requests | Manual `distinctUntilChanged`, inflight tracking   | `@SkipIfCached` deduplicates while loading     |
 | Keyed resources    | Separate state per ID, boilerplate explosion       | `KeyedResourceData` with per-key loading/error |
 
-flurryx gives you **one abstract class**, **two RxJS operators**, and **two decorators**. That's the entire API.
+flurryx gives you **one fluent builder**, **two RxJS operators**, and **two decorators**. That's the entire API.
 
 ---
 
@@ -88,7 +96,7 @@ npm install flurryx
 That's it. The `flurryx` package re-exports everything from the three internal packages (`@flurryx/core`, `@flurryx/store`, `@flurryx/rx`), so every import comes from a single place:
 
 ```typescript
-import { BaseStore, syncToStore, SkipIfCached, Loading } from "flurryx";
+import { Store, syncToStore, SkipIfCached, Loading } from "flurryx";
 import type { ResourceState, KeyedResourceData } from "flurryx";
 ```
 
@@ -137,32 +145,20 @@ npm install @flurryx/core @flurryx/store @flurryx/rx
 
 ### Step 1 — Define your store
 
-A store is an enum of named slots + a type map. Each slot holds a `ResourceState<T>`.
+Define a TypeScript interface mapping slot names to their data types, then pass it to the `Store` builder:
 
 ```typescript
-import { Injectable } from "@angular/core";
-import { BaseStore, type ResourceState } from "flurryx";
+import { Store } from "flurryx";
 
-enum ProductStoreEnum {
-  LIST = "LIST",
-  DETAIL = "DETAIL",
+interface ProductStoreConfig {
+  LIST: Product[];
+  DETAIL: Product;
 }
 
-interface ProductStoreData {
-  [ProductStoreEnum.LIST]: ResourceState<Product[]>;
-  [ProductStoreEnum.DETAIL]: ResourceState<Product>;
-}
-
-@Injectable({ providedIn: "root" })
-export class ProductStore extends BaseStore<
-  typeof ProductStoreEnum,
-  ProductStoreData
-> {
-  constructor() {
-    super(ProductStoreEnum);
-  }
-}
+export const ProductStore = Store.for<ProductStoreConfig>().build();
 ```
+
+That's it. The interface is type-only — zero runtime cost. The builder returns an `InjectionToken` with `providedIn: 'root'`. Every call to `store.get('LIST')` returns `WritableSignal<ResourceState<Product[]>>`, and invalid keys or mismatched types are caught at compile time.
 
 ### Step 2 — Create a facade
 
@@ -179,23 +175,23 @@ export class ProductFacade {
   readonly store = inject(ProductStore);
 
   // Expose signals for templates
-  readonly list = this.store.get(ProductStoreEnum.LIST);
-  readonly detail = this.store.get(ProductStoreEnum.DETAIL);
+  readonly list = this.store.get('LIST');
+  readonly detail = this.store.get('DETAIL');
 
-  @SkipIfCached(ProductStoreEnum.LIST, (i: ProductFacade) => i.store)
-  @Loading(ProductStoreEnum.LIST, (i: ProductFacade) => i.store)
+  @SkipIfCached('LIST', (i: ProductFacade) => i.store)
+  @Loading('LIST', (i: ProductFacade) => i.store)
   loadProducts() {
     this.http
       .get<Product[]>("/api/products")
-      .pipe(syncToStore(this.store, ProductStoreEnum.LIST))
+      .pipe(syncToStore(this.store, 'LIST'))
       .subscribe();
   }
 
-  @Loading(ProductStoreEnum.DETAIL, (i: ProductFacade) => i.store)
+  @Loading('DETAIL', (i: ProductFacade) => i.store)
   loadProduct(id: string) {
     this.http
       .get<Product>(`/api/products/${id}`)
-      .pipe(syncToStore(this.store, ProductStoreEnum.DETAIL))
+      .pipe(syncToStore(this.store, 'DETAIL'))
       .subscribe();
   }
 }
@@ -258,9 +254,32 @@ A slot starts as `{ data: undefined, isLoading: false, status: undefined, errors
                                └───────────┘
 ```
 
-### BaseStore API
+### Store API
 
-`BaseStore<TEnum, TData>` manages a `Map<keyof TEnum, WritableSignal<ResourceState>>`.
+The `Store` builder creates a store backed by `WritableSignal<ResourceState>` per slot. Three creation styles are available:
+
+```typescript
+// 1. Interface-based (recommended) — type-safe with zero boilerplate
+interface MyStoreConfig {
+  USERS: User[];
+  SELECTED: User;
+}
+export const MyStore = Store.for<MyStoreConfig>().build();
+
+// 2. Fluent chaining — inline slot definitions
+export const MyStore = Store
+  .resource('USERS').as<User[]>()
+  .resource('SELECTED').as<User>()
+  .build();
+
+// 3. Enum-constrained — validates keys against a runtime enum
+export const MyStore = Store.for(MyStoreEnum)
+  .resource('USERS').as<User[]>()
+  .resource('SELECTED').as<User>()
+  .build();
+```
+
+Once injected, the store exposes these methods:
 
 | Method                    | Description                                                                           |
 | ------------------------- | ------------------------------------------------------------------------------------- |
@@ -282,6 +301,69 @@ A slot starts as `{ data: undefined, isLoading: false, status: undefined, errors
 
 > Update hooks are stored in a `WeakMap` keyed by store instance, so garbage collection works naturally across multiple store lifetimes.
 
+### Store Creation Styles
+
+#### Interface-based: `Store.for<Config>().build()`
+
+The recommended approach. Define a TypeScript interface where keys are slot names and values are the data types:
+
+```typescript
+import { Store } from "flurryx";
+
+interface ChatStoreConfig {
+  SESSIONS: ChatSession[];
+  CURRENT_SESSION: ChatSession;
+  MESSAGES: ChatMessage[];
+}
+
+export const ChatStore = Store.for<ChatStoreConfig>().build();
+```
+
+The generic argument is type-only — there is no runtime enum or config object. Under the hood, the store lazily creates signals on first access, so un-accessed keys have zero overhead.
+
+Type safety is fully enforced:
+
+```typescript
+const store = inject(ChatStore);
+
+store.get('SESSIONS');                          // WritableSignal<ResourceState<ChatSession[]>>
+store.update('SESSIONS', { data: [session] });  // ✅ type-checked
+store.update('SESSIONS', { data: 42 });         // ❌ TS error — number is not ChatSession[]
+store.get('INVALID');                           // ❌ TS error — key does not exist
+```
+
+#### Fluent chaining: `Store.resource().as<T>().build()`
+
+Define slots inline without a separate interface:
+
+```typescript
+export const ChatStore = Store
+  .resource('SESSIONS').as<ChatSession[]>()
+  .resource('CURRENT_SESSION').as<ChatSession>()
+  .resource('MESSAGES').as<ChatMessage[]>()
+  .build();
+```
+
+#### Enum-constrained: `Store.for(enum).resource().as<T>().build()`
+
+When you have a runtime enum (e.g. shared with backend code), pass it to `.for()` to ensure every key is accounted for:
+
+```typescript
+const ChatStoreEnum = {
+  SESSIONS: 'SESSIONS',
+  CURRENT_SESSION: 'CURRENT_SESSION',
+  MESSAGES: 'MESSAGES',
+} as const;
+
+export const ChatStore = Store.for(ChatStoreEnum)
+  .resource('SESSIONS').as<ChatSession[]>()
+  .resource('CURRENT_SESSION').as<ChatSession>()
+  .resource('MESSAGES').as<ChatMessage[]>()
+  .build();
+```
+
+The builder only allows keys from the enum, and `.build()` is only available once all keys have been defined.
+
 ### syncToStore
 
 RxJS pipeable operator that bridges an `Observable` to a store slot.
@@ -289,7 +371,7 @@ RxJS pipeable operator that bridges an `Observable` to a store slot.
 ```typescript
 this.http
   .get<Product[]>("/api/products")
-  .pipe(syncToStore(this.store, ProductStoreEnum.LIST))
+  .pipe(syncToStore(this.store, 'LIST'))
   .subscribe();
 ```
 
@@ -316,7 +398,7 @@ Same pattern, but targets a specific resource key within a `KeyedResourceData` s
 ```typescript
 this.http
   .get<Invoice>(`/api/invoices/${id}`)
-  .pipe(syncToKeyedStore(this.store, InvoiceStoreEnum.ITEMS, id))
+  .pipe(syncToKeyedStore(this.store, 'ITEMS', id))
   .subscribe();
 ```
 
@@ -325,7 +407,7 @@ Only the targeted resource key is updated. Other keys in the same slot are untou
 **`mapResponse`** — transform the API response before writing to the store:
 
 ```typescript
-syncToKeyedStore(this.store, StoreKey.ITEMS, id, {
+syncToKeyedStore(this.store, 'ITEMS', id, {
   mapResponse: (response) => response.data,
 });
 ```
@@ -335,7 +417,7 @@ syncToKeyedStore(this.store, StoreKey.ITEMS, id, {
 Method decorator that skips execution when the store already has valid data.
 
 ```typescript
-@SkipIfCached(StoreKey.LIST, (i) => i.store)
+@SkipIfCached('LIST', (i) => i.store)
 loadProducts() { /* only runs when cache is stale */ }
 ```
 
@@ -356,10 +438,10 @@ loadProducts() { /* only runs when cache is stale */ }
 
 ```typescript
 @SkipIfCached(
-  storeKey,                   // which store slot to check
+  'LIST',                       // which store slot to check
   (instance) => instance.store, // how to get the store from `this`
-  returnObservable?,          // false (default): void methods; true: returns Observable
-  timeoutMs?                  // default: 300_000 (5 min). Use CACHE_NO_TIMEOUT for infinite
+  returnObservable?,            // false (default): void methods; true: returns Observable
+  timeoutMs?                    // default: 300_000 (5 min). Use CACHE_NO_TIMEOUT for infinite
 )
 ```
 
@@ -375,7 +457,7 @@ loadProducts() { /* only runs when cache is stale */ }
 Method decorator that calls `store.startLoading(key)` before the original method executes.
 
 ```typescript
-@Loading(StoreKey.LIST, (i) => i.store)
+@Loading('LIST', (i) => i.store)
 loadProducts() { /* store.isLoading is already true when this runs */ }
 ```
 
@@ -384,11 +466,11 @@ loadProducts() { /* store.isLoading is already true when this runs */ }
 **Compose both decorators** for the common pattern:
 
 ```typescript
-@SkipIfCached(StoreKey.LIST, (i) => i.store)
-@Loading(StoreKey.LIST, (i) => i.store)
+@SkipIfCached('LIST', (i) => i.store)
+@Loading('LIST', (i) => i.store)
 loadProducts() {
   this.http.get('/api/products')
-    .pipe(syncToStore(this.store, StoreKey.LIST))
+    .pipe(syncToStore(this.store, 'LIST'))
     .subscribe();
 }
 ```
@@ -418,7 +500,7 @@ import { httpErrorNormalizer } from "flurryx/http";
 this.http
   .get("/api/data")
   .pipe(
-    syncToStore(this.store, Key.DATA, {
+    syncToStore(this.store, 'DATA', {
       errorNormalizer: httpErrorNormalizer,
     }),
   )
@@ -467,37 +549,26 @@ Each resource key gets **independent** loading, status, and error tracking. The 
 
 ```typescript
 // Store
-enum InvoiceStoreEnum {
-  ITEMS = "ITEMS",
-}
+import { Store } from "flurryx";
+import type { KeyedResourceData } from "flurryx";
 
-interface InvoiceStoreData {
-  [InvoiceStoreEnum.ITEMS]: ResourceState<KeyedResourceData<string, Invoice>>;
-}
-
-@Injectable({ providedIn: "root" })
-export class InvoiceStore extends BaseStore<
-  typeof InvoiceStoreEnum,
-  InvoiceStoreData
-> {
-  constructor() {
-    super(InvoiceStoreEnum);
-  }
-}
+export const InvoiceStore = Store
+  .resource('ITEMS').as<KeyedResourceData<string, Invoice>>()
+  .build();
 
 // Facade
 @Injectable({ providedIn: "root" })
 export class InvoiceFacade {
   private readonly http = inject(HttpClient);
   readonly store = inject(InvoiceStore);
-  readonly items = this.store.get(InvoiceStoreEnum.ITEMS);
+  readonly items = this.store.get('ITEMS');
 
-  @SkipIfCached(InvoiceStoreEnum.ITEMS, (i: InvoiceFacade) => i.store)
-  @Loading(InvoiceStoreEnum.ITEMS, (i: InvoiceFacade) => i.store)
+  @SkipIfCached('ITEMS', (i: InvoiceFacade) => i.store)
+  @Loading('ITEMS', (i: InvoiceFacade) => i.store)
   loadInvoice(id: string) {
     this.http
       .get<Invoice>(`/api/invoices/${id}`)
-      .pipe(syncToKeyedStore(this.store, InvoiceStoreEnum.ITEMS, id))
+      .pipe(syncToKeyedStore(this.store, 'ITEMS', id))
       .subscribe();
   }
 }

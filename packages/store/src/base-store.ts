@@ -1,11 +1,12 @@
-import { signal, WritableSignal } from '@angular/core';
+import { signal, WritableSignal } from "@angular/core";
 import {
   ResourceState,
   isAnyKeyLoading,
   isKeyedResourceData,
   createKeyedResourceData,
   type KeyedResourceKey,
-} from '@flurryx/core';
+} from "@flurryx/core";
+import type { IStore } from "./types";
 
 type UpdateHooksMap = Map<
   unknown,
@@ -21,8 +22,9 @@ const updateHooksMap = new WeakMap<object, UpdateHooksMap>();
 
 export abstract class BaseStore<
   TEnum extends Record<string, string | number>,
-  TData extends { [K in keyof TEnum]: ResourceState<unknown> },
-> {
+  TData extends { [K in keyof TEnum]: ResourceState<unknown> }
+> implements IStore<TData>
+{
   private readonly signalsState = new Map<
     keyof TEnum,
     WritableSignal<TData[keyof TEnum]>
@@ -126,7 +128,7 @@ export abstract class BaseStore<
           status: undefined,
           isLoading: true,
           errors: undefined,
-        }) as TData[typeof _typedKey]
+        } as TData[typeof _typedKey])
     );
   }
 
@@ -144,7 +146,7 @@ export abstract class BaseStore<
           isLoading: false,
           status: undefined,
           errors: undefined,
-        }) as TData[typeof _typedKey]
+        } as TData[typeof _typedKey])
     );
   }
 
@@ -178,7 +180,7 @@ export abstract class BaseStore<
       },
       status: {
         ...data.status,
-        [resourceKey]: 'Success' as const,
+        [resourceKey]: "Success" as const,
       },
       errors: nextErrors,
     };
@@ -237,7 +239,7 @@ export abstract class BaseStore<
           status: undefined,
           isLoading: isAnyKeyLoading(nextIsLoading),
           errors: undefined,
-        }) as TData[typeof _typedKey]
+        } as TData[typeof _typedKey])
     );
 
     const updatedState = currentState() as TData[K];
@@ -293,7 +295,7 @@ export abstract class BaseStore<
           status: undefined,
           isLoading: isAnyKeyLoading(nextIsLoading),
           errors: undefined,
-        }) as TData[typeof _typedKey]
+        } as TData[typeof _typedKey])
     );
 
     const updatedState = currentState() as TData[K];
@@ -330,9 +332,7 @@ export abstract class BaseStore<
       };
       this.signalsState.set(
         _typedKey,
-        signal<TData[typeof _typedKey]>(
-          initialState as TData[typeof _typedKey]
-        )
+        signal<TData[typeof _typedKey]>(initialState as TData[typeof _typedKey])
       );
     });
   }

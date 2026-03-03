@@ -1,5 +1,5 @@
 import { finalize, Observable, take, tap } from "rxjs";
-import { BaseStore } from "@flurryx/store";
+import type { IStore } from "@flurryx/store";
 import type { ResourceState } from "@flurryx/core";
 import {
   defaultErrorNormalizer,
@@ -13,11 +13,11 @@ export interface SyncToStoreOptions {
 }
 
 export function syncToStore<
-  TEnum extends Record<string, string | number>,
-  TData extends { [K in keyof TEnum]: ResourceState<unknown> }
+  TData extends Record<string, ResourceState<unknown>>,
+  K extends keyof TData & string
 >(
-  store: BaseStore<TEnum, TData>,
-  key: keyof TEnum,
+  store: IStore<TData>,
+  key: K,
   options: SyncToStoreOptions = { completeOnFirstEmission: true }
 ) {
   const normalizeError = options.errorNormalizer ?? defaultErrorNormalizer;

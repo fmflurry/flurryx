@@ -29,3 +29,25 @@ export class InjectionToken<T> {
     }
   ) {}
 }
+
+// ---------------------------------------------------------------------------
+// Minimal DI container for testing
+// ---------------------------------------------------------------------------
+
+const _providers = new Map<InjectionToken<unknown>, unknown>();
+
+export function inject<T>(token: InjectionToken<T>): T {
+  if (_providers.has(token as InjectionToken<unknown>)) {
+    return _providers.get(token as InjectionToken<unknown>) as T;
+  }
+  if (token.options?.factory) {
+    const instance = token.options.factory();
+    _providers.set(token as InjectionToken<unknown>, instance);
+    return instance;
+  }
+  throw new Error(`NullInjectorError: No provider for ${token.description}`);
+}
+
+export function _resetProviders(): void {
+  _providers.clear();
+}

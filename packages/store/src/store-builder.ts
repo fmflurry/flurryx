@@ -1,8 +1,10 @@
-import { InjectionToken } from "@angular/core";
+import { InjectionToken, inject } from "@angular/core";
 import { BaseStore } from "./base-store";
 import { DynamicStore } from "./dynamic-store";
 import { LazyStore } from "./lazy-store";
+import { mirrorKey } from "./mirror-key";
 import { resource } from "./resource";
+import type { ResourceState } from "@flurryx/core";
 import type {
   StoreConfig,
   ResourceDef,
@@ -11,6 +13,28 @@ import type {
   ConfigToData,
   IStore,
 } from "./types";
+
+// ---------------------------------------------------------------------------
+// Mirror definition — accumulated by builders, wired up in build() factory
+// ---------------------------------------------------------------------------
+
+interface MirrorDef {
+  readonly sourceToken: InjectionToken<
+    IStore<Record<string, ResourceState<unknown>>>
+  >;
+  readonly sourceKey: string;
+  readonly targetKey: string;
+}
+
+function wireMirrors<
+  TStore extends IStore<Record<string, ResourceState<unknown>>>
+>(store: TStore, mirrors: readonly MirrorDef[]): TStore {
+  for (const def of mirrors) {
+    const sourceStore = inject(def.sourceToken);
+    mirrorKey(sourceStore, def.sourceKey, store, def.targetKey);
+  }
+  return store;
+}
 
 // ---------------------------------------------------------------------------
 // Unconstrained builder (existing API)
@@ -29,11 +53,17 @@ interface AsStep<TAccum extends StoreConfig, TKey extends string> {
  */
 interface StoreBuilder<TAccum extends StoreConfig> {
   resource<TKey extends string>(key: TKey): AsStep<TAccum, TKey>;
+  mirror<TSourceData extends Record<string, ResourceState<unknown>>>(
+    source: InjectionToken<IStore<TSourceData>>,
+    sourceKey: keyof TSourceData & string,
+    targetKey?: keyof TAccum & string
+  ): StoreBuilder<TAccum>;
   build(): InjectionToken<BaseStore<InferEnum<TAccum>, InferData<TAccum>>>;
 }
 
 function createBuilder<TAccum extends StoreConfig>(
-  accum: TAccum
+  accum: TAccum,
+  mirrors: readonly MirrorDef[] = []
 ): StoreBuilder<TAccum> {
   return {
     resource<TKey extends string>(key: TKey): AsStep<TAccum, TKey> {
@@ -43,16 +73,30 @@ function createBuilder<TAccum extends StoreConfig>(
             ...accum,
             [key]: resource<T>(),
           } as TAccum & Record<TKey, ResourceDef<T>>;
-          return createBuilder(nextAccum);
+          return createBuilder(nextAccum, mirrors);
         },
       };
+    },
+    mirror(source, sourceKey, targetKey?) {
+      const def: MirrorDef = {
+        sourceToken: source as InjectionToken<
+          IStore<Record<string, ResourceState<unknown>>>
+        >,
+        sourceKey,
+        targetKey: (targetKey ?? sourceKey) as string,
+      };
+      return createBuilder(accum, [...mirrors, def]);
     },
     build() {
       return new InjectionToken<
         BaseStore<InferEnum<TAccum>, InferData<TAccum>>
       >("FlurryxStore", {
         providedIn: "root",
-        factory: () => new DynamicStore(accum),
+        factory: () =>
+          wireMirrors(new DynamicStore(accum), mirrors) as BaseStore<
+            InferEnum<TAccum>,
+            InferData<TAccum>
+          >,
       });
     },
   };
@@ -86,6 +130,11 @@ type ConstrainedBuilder<
   TAccum extends StoreConfig
 > = [Remaining<TEnum, TAccum>] extends [never]
   ? {
+      mirror<TSourceData extends Record<string, ResourceState<unknown>>>(
+        source: InjectionToken<IStore<TSourceData>>,
+        sourceKey: keyof TSourceData & string,
+        targetKey?: keyof TAccum & string
+      ): ConstrainedBuilder<TEnum, TAccum>;
       build(): InjectionToken<BaseStore<InferEnum<TAccum>, InferData<TAccum>>>;
     }
   : {
@@ -97,7 +146,11 @@ type ConstrainedBuilder<
 function createConstrainedBuilder<
   TEnum extends Record<string, string>,
   TAccum extends StoreConfig
->(_enumObj: TEnum, accum: TAccum): ConstrainedBuilder<TEnum, TAccum> {
+>(
+  _enumObj: TEnum,
+  accum: TAccum,
+  mirrors: readonly MirrorDef[] = []
+): ConstrainedBuilder<TEnum, TAccum> {
   return {
     resource<TKey extends string>(
       key: TKey
@@ -111,19 +164,75 @@ function createConstrainedBuilder<
             ...accum,
             [key]: resource<T>(),
           } as TAccum & Record<TKey, ResourceDef<T>>;
-          return createConstrainedBuilder(_enumObj, nextAccum);
+          return createConstrainedBuilder(_enumObj, nextAccum, mirrors);
         },
       };
+    },
+    mirror(
+      source: InjectionToken<IStore<Record<string, ResourceState<unknown>>>>,
+      sourceKey: string,
+      targetKey?: string
+    ) {
+      const def: MirrorDef = {
+        sourceToken: source,
+        sourceKey,
+        targetKey: targetKey ?? sourceKey,
+      };
+      return createConstrainedBuilder(_enumObj, accum, [...mirrors, def]);
     },
     build() {
       return new InjectionToken<
         BaseStore<InferEnum<TAccum>, InferData<TAccum>>
       >("FlurryxStore", {
         providedIn: "root",
-        factory: () => new DynamicStore(accum),
+        factory: () =>
+          wireMirrors(new DynamicStore(accum), mirrors) as BaseStore<
+            InferEnum<TAccum>,
+            InferData<TAccum>
+          >,
       });
     },
   } as ConstrainedBuilder<TEnum, TAccum>;
+}
+
+// ---------------------------------------------------------------------------
+// Interface-based builder (Store.for<Config>() API)
+// ---------------------------------------------------------------------------
+
+interface InterfaceBuilder<TConfig extends Record<string, unknown>> {
+  mirror<TSourceData extends Record<string, ResourceState<unknown>>>(
+    source: InjectionToken<IStore<TSourceData>>,
+    sourceKey: keyof TSourceData & string,
+    targetKey?: keyof TConfig & string
+  ): InterfaceBuilder<TConfig>;
+  build(): InjectionToken<IStore<ConfigToData<TConfig>>>;
+}
+
+function createInterfaceBuilder<TConfig extends Record<string, unknown>>(
+  mirrors: readonly MirrorDef[] = []
+): InterfaceBuilder<TConfig> {
+  return {
+    mirror(source, sourceKey, targetKey?) {
+      const def: MirrorDef = {
+        sourceToken: source as InjectionToken<
+          IStore<Record<string, ResourceState<unknown>>>
+        >,
+        sourceKey,
+        targetKey: (targetKey ?? sourceKey) as string,
+      };
+      return createInterfaceBuilder<TConfig>([...mirrors, def]);
+    },
+    build() {
+      return new InjectionToken("FlurryxStore", {
+        providedIn: "root",
+        factory: () =>
+          wireMirrors(
+            new LazyStore() as IStore<Record<string, ResourceState<unknown>>>,
+            mirrors
+          ) as unknown as IStore<ConfigToData<TConfig>>,
+      });
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -153,9 +262,7 @@ interface StoreEntry {
    * }
    * const ChatStore = Store.for<ChatStoreConfig>().build();
    */
-  for<TConfig extends Record<string, unknown>>(): {
-    build(): InjectionToken<IStore<ConfigToData<TConfig>>>;
-  };
+  for<TConfig extends Record<string, unknown>>(): InterfaceBuilder<TConfig>;
 
   /**
    * Bind the builder to an enum object for compile-time key validation.
@@ -194,14 +301,7 @@ export const Store: StoreEntry = {
   ...createBuilder({} as StoreConfig),
   for(enumObj?: Record<string, string>) {
     if (arguments.length === 0) {
-      return {
-        build() {
-          return new InjectionToken("FlurryxStore", {
-            providedIn: "root",
-            factory: () => new LazyStore(),
-          });
-        },
-      };
+      return createInterfaceBuilder();
     }
     return createConstrainedBuilder(enumObj!, {} as Record<string, never>);
   },

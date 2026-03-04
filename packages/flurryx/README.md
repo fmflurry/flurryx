@@ -66,6 +66,7 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
   - [Constants](#constants)
 - [Keyed Resources](#keyed-resources)
 - [Store Mirroring](#store-mirroring)
+  - [Builder .mirror()](#builder-mirror)
   - [mirrorKey](#mirrorkey)
   - [collectKeyed](#collectkeyed)
 - [Design Decisions](#design-decisions)
@@ -617,8 +618,73 @@ When building session or aggregation stores that combine state from multiple fea
 ```
 
 ```typescript
-import { mirrorKey, collectKeyed } from "flurryx";
+import { Store, mirrorKey, collectKeyed } from "flurryx";
 ```
+
+### Builder .mirror()
+
+The simplest way to set up mirroring is directly in the store builder. Chain `.mirror()` to declare which source stores to mirror from — the wiring happens automatically when Angular creates the store.
+
+```typescript
+// Feature stores
+interface CustomerStoreConfig {
+  CUSTOMERS: Customer[];
+}
+export const CustomerStore = Store.for<CustomerStoreConfig>().build();
+
+interface OrderStoreConfig {
+  ORDERS: Order[];
+}
+export const OrderStore = Store.for<OrderStoreConfig>().build();
+```
+
+**Interface-based builder** (recommended):
+
+```typescript
+interface SessionStoreConfig {
+  CUSTOMERS: Customer[];
+  ORDERS: Order[];
+}
+
+export const SessionStore = Store.for<SessionStoreConfig>()
+  .mirror(CustomerStore, 'CUSTOMERS')
+  .mirror(OrderStore, 'ORDERS')
+  .build();
+```
+
+**Fluent chaining:**
+
+```typescript
+export const SessionStore = Store
+  .resource('CUSTOMERS').as<Customer[]>()
+  .resource('ORDERS').as<Order[]>()
+  .mirror(CustomerStore, 'CUSTOMERS')
+  .mirror(OrderStore, 'ORDERS')
+  .build();
+```
+
+**Enum-constrained:**
+
+```typescript
+const SessionEnum = { CUSTOMERS: 'CUSTOMERS', ORDERS: 'ORDERS' } as const;
+
+export const SessionStore = Store.for(SessionEnum)
+  .resource('CUSTOMERS').as<Customer[]>()
+  .resource('ORDERS').as<Order[]>()
+  .mirror(CustomerStore, 'CUSTOMERS')
+  .mirror(OrderStore, 'ORDERS')
+  .build();
+```
+
+**Different source and target keys:**
+
+```typescript
+export const SessionStore = Store.for<{ ARTICLES: Item[] }>()
+  .mirror(ItemStore, 'ITEMS', 'ARTICLES')
+  .build();
+```
+
+The builder calls `inject()` under the hood, so source stores are resolved through Angular's DI. Everything — data, loading, status, errors — is mirrored automatically. No manual cleanup needed; the mirrors live as long as the store.
 
 ### mirrorKey
 
@@ -660,24 +726,9 @@ mirrorKey(customersStore, 'ITEMS', sessionStore, 'ARTICLES', { destroyRef });
 
 **Full example — session store that aggregates feature stores:**
 
+For simple aggregation, prefer the [builder `.mirror()` approach](#builder-mirror). Use `mirrorKey` when you need imperative control — e.g. conditional mirroring, late setup, or `DestroyRef`-based cleanup:
+
 ```typescript
-// Feature stores
-interface CustomerStoreConfig {
-  CUSTOMERS: Customer[];
-}
-export const CustomerStore = Store.for<CustomerStoreConfig>().build();
-
-interface OrderStoreConfig {
-  ORDERS: Order[];
-}
-export const OrderStore = Store.for<OrderStoreConfig>().build();
-
-// Session store — mirrors state from feature stores
-interface SessionStoreConfig {
-  CUSTOMERS: Customer[];
-  ORDERS: Order[];
-}
-
 @Injectable({ providedIn: 'root' })
 export class SessionStore {
   private readonly customerStore = inject(CustomerStore);

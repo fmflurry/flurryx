@@ -67,6 +67,7 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
 - [Keyed Resources](#keyed-resources)
 - [Store Mirroring](#store-mirroring)
   - [Builder .mirror()](#builder-mirror)
+  - [Builder .mirrorKeyed()](#builder-mirrorkeyed)
   - [mirrorKey](#mirrorkey)
   - [collectKeyed](#collectkeyed)
 - [Design Decisions](#design-decisions)
@@ -611,9 +612,14 @@ When building session or aggregation stores that combine state from multiple fea
 | (ORDERS)           |-- mirrorKey ------>|  CUSTOMERS      +  |
 +--------------------+                    |  ORDERS         +  |
                                           |  CUSTOMER_CACHE +  |
-+--------------------+                    |                    |
++--------------------+                    |  ORDER_CACHE    +  |
 | Feature Store C    |                    |                    |
 | (CUSTOMER_DETAIL)  |-- collectKeyed --->|                    |
++--------------------+                    |                    |
+                                          |                    |
++--------------------+                    |                    |
+| Feature Store D    |                    |                    |
+| (ORDER_DETAIL)     |-- mirrorKeyed --->|                    |
 +--------------------+                    +--------------------+
 ```
 
@@ -685,6 +691,77 @@ export const SessionStore = Store.for<{ ARTICLES: Item[] }>()
 ```
 
 The builder calls `inject()` under the hood, so source stores are resolved through Angular's DI. Everything — data, loading, status, errors — is mirrored automatically. No manual cleanup needed; the mirrors live as long as the store.
+
+### Builder .mirrorKeyed()
+
+When the source store holds a single-entity slot (e.g. `CUSTOMER_DETAILS: Customer`) and you want to accumulate those fetches into a `KeyedResourceData` cache on the target, use `.mirrorKeyed()`. It is the builder equivalent of [`collectKeyed`](#collectkeyed).
+
+```typescript
+// Feature store — fetches one customer at a time
+interface CustomerStoreConfig {
+  CUSTOMERS: Customer[];
+  CUSTOMER_DETAILS: Customer;
+}
+export const CustomerStore = Store.for<CustomerStoreConfig>().build();
+```
+
+**Interface-based builder** (recommended):
+
+```typescript
+interface SessionStoreConfig {
+  CUSTOMERS: Customer[];
+  CUSTOMER_CACHE: KeyedResourceData<string, Customer>;
+}
+
+export const SessionStore = Store.for<SessionStoreConfig>()
+  .mirror(CustomerStore, 'CUSTOMERS')
+  .mirrorKeyed(CustomerStore, 'CUSTOMER_DETAILS', {
+    extractId: (data) => data?.id,
+  }, 'CUSTOMER_CACHE')
+  .build();
+```
+
+**Fluent chaining:**
+
+```typescript
+export const SessionStore = Store
+  .resource('CUSTOMERS').as<Customer[]>()
+  .resource('CUSTOMER_CACHE').as<KeyedResourceData<string, Customer>>()
+  .mirror(CustomerStore, 'CUSTOMERS')
+  .mirrorKeyed(CustomerStore, 'CUSTOMER_DETAILS', {
+    extractId: (data) => data?.id,
+  }, 'CUSTOMER_CACHE')
+  .build();
+```
+
+**Enum-constrained:**
+
+```typescript
+const SessionEnum = { CUSTOMERS: 'CUSTOMERS', CUSTOMER_CACHE: 'CUSTOMER_CACHE' } as const;
+
+export const SessionStore = Store.for(SessionEnum)
+  .resource('CUSTOMERS').as<Customer[]>()
+  .resource('CUSTOMER_CACHE').as<KeyedResourceData<string, Customer>>()
+  .mirror(CustomerStore, 'CUSTOMERS')
+  .mirrorKeyed(CustomerStore, 'CUSTOMER_DETAILS', {
+    extractId: (data) => data?.id,
+  }, 'CUSTOMER_CACHE')
+  .build();
+```
+
+**Same source and target key** — when the key names match, the last argument can be omitted:
+
+```typescript
+export const SessionStore = Store.for<{
+  CUSTOMER_DETAILS: KeyedResourceData<string, Customer>;
+}>()
+  .mirrorKeyed(CustomerStore, 'CUSTOMER_DETAILS', {
+    extractId: (data) => data?.id,
+  })
+  .build();
+```
+
+Each entity fetched through the source slot is accumulated by ID into the target's `KeyedResourceData`. Loading, status, and errors are tracked per entity. When the source is cleared, the corresponding entity is removed from the cache.
 
 ### mirrorKey
 

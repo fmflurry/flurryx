@@ -1,4 +1,4 @@
-import type { WritableSignal } from "@angular/core";
+import type { Signal } from "@angular/core";
 import type { ResourceState, KeyedResourceKey } from "@flurryx/core";
 
 /**
@@ -45,7 +45,7 @@ export type ConfigToData<TConfig extends Record<string, unknown>> = {
  * Shared store interface implemented by both BaseStore and LazyStore.
  */
 export interface IStore<TData extends Record<string, ResourceState<unknown>>> {
-  get<K extends keyof TData & string>(key: K): WritableSignal<TData[K]>;
+  get<K extends keyof TData & string>(key: K): Signal<TData[K]>;
   update<K extends keyof TData & string>(
     key: K,
     newState: Partial<TData[K]>

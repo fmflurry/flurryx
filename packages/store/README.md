@@ -48,7 +48,7 @@ export const MyStore = Store.for(Enum)
 
 | Method | Description |
 |---|---|
-| `get(key)` | Returns the `WritableSignal` for a slot |
+| `get(key)` | Returns the `Signal` for a slot |
 | `update(key, partial)` | Merges partial state (immutable spread) |
 | `clear(key)` | Resets a slot to its initial empty state |
 | `clearAll()` | Resets every slot |
@@ -65,6 +65,10 @@ For slots holding `KeyedResourceData<TKey, TValue>`:
 | `updateKeyedOne(key, resourceKey, entity)` | Merges one entity into a keyed slot |
 | `clearKeyedOne(key, resourceKey)` | Removes one entity from a keyed slot |
 | `startKeyedLoading(key, resourceKey)` | Sets loading for a single resource key |
+
+### Read-only signals
+
+`get(key)` returns a **read-only `Signal`**, not a `WritableSignal`. Consumers can read state but cannot mutate it directly — all writes must go through the store's own methods (`update`, `clear`, `startLoading`, …). This enforces strict encapsulation: the store is the single owner of its state, and external code can only observe it.
 
 ## Clearing Store Data
 

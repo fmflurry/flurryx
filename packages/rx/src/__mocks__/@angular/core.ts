@@ -1,5 +1,8 @@
-export type WritableSignal<T> = {
+export type Signal<T> = {
   (): T;
+};
+
+export type WritableSignal<T> = Signal<T> & {
   set: (value: T) => void;
   update: (fn: (value: T) => T) => void;
 };

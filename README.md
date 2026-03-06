@@ -65,6 +65,7 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
   - [Error Normalization](#error-normalization)
   - [Constants](#constants)
 - [Keyed Resources](#keyed-resources)
+- [Clearing Store Data](#clearing-store-data)
 - [Store Mirroring](#store-mirroring)
   - [Builder .mirror()](#builder-mirror)
   - [Builder .mirrorKeyed()](#builder-mirrorkeyed)
@@ -594,6 +595,68 @@ import {
   isAnyKeyLoading, // (loading: Record) => boolean
 } from "flurryx";
 ```
+
+---
+
+## Clearing Store Data
+
+flurryx provides two levels of cache invalidation: **whole-slot clearing** and **per-key clearing** for keyed resources.
+
+### Whole-slot clearing
+
+Reset an entire store slot back to its initial empty state:
+
+```typescript
+const store = inject(ProductStore);
+
+// Clear a single slot
+store.clear('LIST');
+// LIST is now { data: undefined, isLoading: false, status: undefined, errors: undefined }
+
+// Clear every slot in the store
+store.clearAll();
+```
+
+This is the right choice when the slot holds a single value (e.g. `Product`, `User[]`).
+
+### Per-key clearing for keyed resources
+
+When a slot holds a `KeyedResourceData` (a map of entities indexed by ID), `clear('ITEMS')` wipes **every** cached entity. If you only need to invalidate one entry — for example after a delete or an edit — use `clearKeyedOne`:
+
+```typescript
+const store = inject(InvoiceStore);
+
+// Remove only invoice "inv-42" from the cache.
+// All other cached invoices remain untouched.
+store.clearKeyedOne('ITEMS', 'inv-42');
+```
+
+`clearKeyedOne` removes the entity, its loading flag, status, and errors for that single key, then recalculates the top-level `isLoading` based on the remaining keys.
+
+**Facade example — delete an invoice and evict it from cache:**
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class InvoiceFacade {
+  private readonly http = inject(HttpClient);
+  readonly store = inject(InvoiceStore);
+
+  deleteInvoice(id: string) {
+    this.http.delete(`/api/invoices/${id}`).subscribe(() => {
+      // Remove only this invoice from the keyed cache
+      this.store.clearKeyedOne('ITEMS', id);
+    });
+  }
+}
+```
+
+**Comparison:**
+
+| Method | Scope | Use when |
+|---|---|---|
+| `clear(key)` | Entire slot | Logging out, resetting a form, full refresh |
+| `clearAll()` | Every slot | Session teardown |
+| `clearKeyedOne(key, resourceKey)` | Single entity in a keyed slot | Deleting or invalidating one cached item |
 
 ---
 

@@ -1,5 +1,5 @@
 import type { WritableSignal } from "@angular/core";
-import type { ResourceState } from "@flurryx/core";
+import type { ResourceState, KeyedResourceKey } from "@flurryx/core";
 
 /**
  * Phantom-typed marker for a store resource slot.
@@ -54,6 +54,19 @@ export interface IStore<TData extends Record<string, ResourceState<unknown>>> {
   clearAll(): void;
   startLoading<K extends keyof TData & string>(key: K): void;
   stopLoading<K extends keyof TData & string>(key: K): void;
+  updateKeyedOne<K extends keyof TData & string>(
+    key: K,
+    resourceKey: KeyedResourceKey,
+    entity: unknown
+  ): void;
+  clearKeyedOne<K extends keyof TData & string>(
+    key: K,
+    resourceKey: KeyedResourceKey
+  ): void;
+  startKeyedLoading<K extends keyof TData & string>(
+    key: K,
+    resourceKey: KeyedResourceKey
+  ): void;
   onUpdate<K extends keyof TData & string>(
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void

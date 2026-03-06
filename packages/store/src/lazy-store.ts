@@ -1,6 +1,12 @@
-import { signal, WritableSignal } from '@angular/core';
-import type { ResourceState } from '@flurryx/core';
-import type { IStore } from './types';
+import { signal, WritableSignal } from "@angular/core";
+import {
+  isAnyKeyLoading,
+  isKeyedResourceData,
+  createKeyedResourceData,
+  type ResourceState,
+  type KeyedResourceKey,
+} from "@flurryx/core";
+import type { IStore } from "./types";
 
 type UpdateCallback = (
   nextState: ResourceState<unknown>,
@@ -21,11 +27,13 @@ function createDefaultState<T>(): ResourceState<T> {
  * Used by the `Store.for<Config>().build()` API where keys are
  * known only at the type level (no runtime enum).
  */
-export class LazyStore<
-  TData extends Record<string, ResourceState<unknown>>,
-> implements IStore<TData>
+export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
+  implements IStore<TData>
 {
-  private readonly signals = new Map<string, WritableSignal<ResourceState<unknown>>>();
+  private readonly signals = new Map<
+    string,
+    WritableSignal<ResourceState<unknown>>
+  >();
   private readonly hooks = new Map<string, UpdateCallback[]>();
 
   private getOrCreate<K extends keyof TData & string>(
@@ -77,7 +85,7 @@ export class LazyStore<
           status: undefined,
           isLoading: true,
           errors: undefined,
-        }) as TData[K]
+        } as TData[K])
     );
   }
 
@@ -90,8 +98,133 @@ export class LazyStore<
           isLoading: false,
           status: undefined,
           errors: undefined,
-        }) as TData[K]
+        } as TData[K])
     );
+  }
+
+  updateKeyedOne<K extends keyof TData & string>(
+    key: K,
+    resourceKey: KeyedResourceKey,
+    entity: unknown
+  ): void {
+    const sig = this.getOrCreate(key);
+    const state = sig();
+    const data = isKeyedResourceData(state.data)
+      ? state.data
+      : createKeyedResourceData();
+
+    const nextErrors = { ...data.errors };
+    delete nextErrors[resourceKey];
+
+    const nextData = {
+      ...data,
+      entities: { ...data.entities, [resourceKey]: entity },
+      isLoading: { ...data.isLoading, [resourceKey]: false },
+      status: { ...data.status, [resourceKey]: "Success" as const },
+      errors: nextErrors,
+    };
+
+    this.update(key, {
+      data: nextData as unknown,
+      isLoading: isAnyKeyLoading(nextData.isLoading),
+      status: undefined,
+      errors: undefined,
+    } as Partial<TData[K]>);
+  }
+
+  clearKeyedOne<K extends keyof TData & string>(
+    key: K,
+    resourceKey: KeyedResourceKey
+  ): void {
+    const sig = this.getOrCreate(key);
+    const state = sig();
+    if (!isKeyedResourceData(state.data)) {
+      return;
+    }
+
+    const data = state.data;
+    const previousState = state as TData[K];
+
+    const nextEntities = { ...data.entities };
+    delete nextEntities[resourceKey];
+
+    const nextIsLoading = { ...data.isLoading };
+    delete nextIsLoading[resourceKey];
+
+    const nextStatus = { ...data.status };
+    delete nextStatus[resourceKey];
+
+    const nextErrors = { ...data.errors };
+    delete nextErrors[resourceKey];
+
+    const nextData = {
+      ...data,
+      entities: nextEntities,
+      isLoading: nextIsLoading,
+      status: nextStatus,
+      errors: nextErrors,
+    };
+
+    sig.update(
+      (prev) =>
+        ({
+          ...prev,
+          data: nextData as unknown,
+          status: undefined,
+          isLoading: isAnyKeyLoading(nextIsLoading),
+          errors: undefined,
+        } as TData[K])
+    );
+
+    const updatedState = sig() as TData[K];
+    this.notifyHooks(key, updatedState, previousState);
+  }
+
+  startKeyedLoading<K extends keyof TData & string>(
+    key: K,
+    resourceKey: KeyedResourceKey
+  ): void {
+    const sig = this.getOrCreate(key);
+    const state = sig();
+    if (!isKeyedResourceData(state.data)) {
+      this.startLoading(key);
+      return;
+    }
+
+    const previousState = state as TData[K];
+    const data = state.data;
+
+    const nextIsLoading = {
+      ...data.isLoading,
+      [resourceKey]: true,
+    } as typeof data.isLoading;
+
+    const nextStatus: typeof data.status = { ...data.status };
+    delete nextStatus[resourceKey];
+
+    const nextErrors: typeof data.errors = { ...data.errors };
+    delete nextErrors[resourceKey];
+
+    const nextData = {
+      ...data,
+      isLoading: nextIsLoading,
+      status: nextStatus,
+      errors: nextErrors,
+    };
+
+    sig.update(
+      (previous) =>
+        ({
+          ...previous,
+          data: nextData,
+          status: undefined,
+          isLoading: isAnyKeyLoading(nextIsLoading),
+          errors: undefined,
+        } as TData[K])
+    );
+
+    const updatedState = sig() as TData[K];
+    this.notifyHooks(key, updatedState, previousState);
   }
 
   onUpdate<K extends keyof TData & string>(

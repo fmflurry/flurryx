@@ -5,11 +5,17 @@ vi.mock("@angular/core", async () => {
 });
 
 import { LazyStore } from "../lazy-store";
-import type { ResourceState } from "@flurryx/core";
+import type { ResourceState, KeyedResourceData } from "@flurryx/core";
+
+interface TestEntity {
+  id: string;
+  name: string;
+}
 
 type TestData = {
   items: ResourceState<string[]>;
   count: ResourceState<number>;
+  details: ResourceState<KeyedResourceData<string, TestEntity>>;
 };
 
 describe("LazyStore", () => {
@@ -147,5 +153,154 @@ describe("LazyStore", () => {
 
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
+  });
+
+  describe("keyed operations", () => {
+    it("updateKeyedOne should add entity to keyed data", () => {
+      const store = new LazyStore<TestData>();
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Item 1" });
+
+      const state = store.get("details")();
+      const data = state.data as KeyedResourceData<string, TestEntity>;
+      expect(data.entities["1"]).toEqual({ id: "1", name: "Item 1" });
+      expect(data.isLoading["1"]).toBe(false);
+      expect(data.status["1"]).toBe("Success");
+      expect(state.isLoading).toBe(false);
+    });
+
+    it("updateKeyedOne should initialize keyed data when key has no data", () => {
+      const store = new LazyStore<TestData>();
+
+      store.updateKeyedOne("details", "a", { id: "a", name: "Alpha" });
+
+      const state = store.get("details")();
+      const data = state.data as KeyedResourceData<string, TestEntity>;
+      expect(data.entities).toEqual({ a: { id: "a", name: "Alpha" } });
+      expect(data.isLoading).toEqual({ a: false });
+      expect(data.status).toEqual({ a: "Success" });
+      expect(data.errors).toEqual({});
+    });
+
+    it("updateKeyedOne should clear previous errors for that key", () => {
+      const store = new LazyStore<TestData>();
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Item 1" });
+      // Manually inject an error state
+      const current = store.get("details")();
+      const keyed = current.data as KeyedResourceData<string, TestEntity>;
+      store.update("details", {
+        data: {
+          ...keyed,
+          errors: { "1": [{ code: "E", message: "fail" }] },
+        },
+      } as Partial<TestData["details"]>);
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Updated" });
+
+      const state = store.get("details")();
+      const data = state.data as KeyedResourceData<string, TestEntity>;
+      expect(data.errors["1"]).toBeUndefined();
+      expect(data.entities["1"]).toEqual({ id: "1", name: "Updated" });
+    });
+
+    it("clearKeyedOne should remove a single keyed entity", () => {
+      const store = new LazyStore<TestData>();
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Item 1" });
+      store.updateKeyedOne("details", "2", { id: "2", name: "Item 2" });
+
+      store.clearKeyedOne("details", "1");
+
+      const state = store.get("details")();
+      const data = state.data as KeyedResourceData<string, TestEntity>;
+      expect(data.entities["1"]).toBeUndefined();
+      expect(data.entities["2"]).toEqual({ id: "2", name: "Item 2" });
+      expect(data.isLoading["1"]).toBeUndefined();
+      expect(data.status["1"]).toBeUndefined();
+      expect(data.errors["1"]).toBeUndefined();
+    });
+
+    it("clearKeyedOne should recalculate isLoading after removal", () => {
+      const store = new LazyStore<TestData>();
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Item 1" });
+      store.startKeyedLoading("details", "2");
+
+      // "2" is loading, "1" is not
+      expect(store.get("details")().isLoading).toBe(true);
+
+      // Remove the loading key
+      store.clearKeyedOne("details", "2");
+
+      expect(store.get("details")().isLoading).toBe(false);
+    });
+
+    it("clearKeyedOne should do nothing if data is not keyed", () => {
+      const store = new LazyStore<TestData>();
+
+      store.update("items", { data: ["plain"] });
+      expect(() => store.clearKeyedOne("items", "key1")).not.toThrow();
+
+      expect(store.get("items")().data).toEqual(["plain"]);
+    });
+
+    it("clearKeyedOne should notify update hooks", () => {
+      const store = new LazyStore<TestData>();
+      const cb = vi.fn();
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Item 1" });
+
+      store.onUpdate("details", cb);
+      store.clearKeyedOne("details", "1");
+
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    it("startKeyedLoading should set loading for a specific key", () => {
+      const store = new LazyStore<TestData>();
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Item 1" });
+      store.startKeyedLoading("details", "2");
+
+      const state = store.get("details")();
+      const data = state.data as KeyedResourceData<string, TestEntity>;
+      expect(data.isLoading["2"]).toBe(true);
+      expect(data.isLoading["1"]).toBe(false);
+      expect(state.isLoading).toBe(true);
+    });
+
+    it("startKeyedLoading should clear status and errors for that key", () => {
+      const store = new LazyStore<TestData>();
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Item 1" });
+      store.startKeyedLoading("details", "1");
+
+      const state = store.get("details")();
+      const data = state.data as KeyedResourceData<string, TestEntity>;
+      expect(data.status["1"]).toBeUndefined();
+      expect(data.errors["1"]).toBeUndefined();
+      expect(data.isLoading["1"]).toBe(true);
+    });
+
+    it("startKeyedLoading should fall back to startLoading if no keyed data", () => {
+      const store = new LazyStore<TestData>();
+
+      store.startKeyedLoading("items", "key1");
+
+      const state = store.get("items")();
+      expect(state.isLoading).toBe(true);
+    });
+
+    it("startKeyedLoading should notify update hooks", () => {
+      const store = new LazyStore<TestData>();
+      const cb = vi.fn();
+
+      store.updateKeyedOne("details", "1", { id: "1", name: "Item 1" });
+      store.onUpdate("details", cb);
+      store.startKeyedLoading("details", "2");
+
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
   });
 });

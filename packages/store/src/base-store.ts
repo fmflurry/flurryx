@@ -36,7 +36,7 @@ export abstract class BaseStore<
   }
 
   get<K extends keyof TData>(key: K): Signal<TData[K]> {
-    return this.signalsState.get(key.toString()) as Signal<TData[K]>;
+    return this.signalsState.get(key.toString()) as unknown as Signal<TData[K]>;
   }
 
   onUpdate<K extends keyof TData>(

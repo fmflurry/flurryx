@@ -1,6 +1,6 @@
 {
   "name": "@flurryx/core",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Core types and utilities for flurryx state management",
   "license": "MIT",
   "type": "module",

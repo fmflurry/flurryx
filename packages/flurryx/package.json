@@ -1,6 +1,6 @@
 {
   "name": "flurryx",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "description": "Signal-first reactive state management for Angular",
   "license": "MIT",
   "type": "module",
@@ -38,9 +38,9 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@flurryx/core": "0.7.4",
-    "@flurryx/store": "0.7.4",
-    "@flurryx/rx": "0.7.4"
+    "@flurryx/core": "0.7.5",
+    "@flurryx/store": "0.7.5",
+    "@flurryx/rx": "0.7.5"
   },
   "peerDependencies": {
     "@angular/core": ">=17.0.0",

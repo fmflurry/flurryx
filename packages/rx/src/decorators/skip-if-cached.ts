@@ -1,11 +1,11 @@
-import { WritableSignal } from '@angular/core';
-import { finalize, Observable, of, shareReplay, tap } from 'rxjs';
-import type { ResourceState, StoreEnum, KeyedResourceKey } from '@flurryx/core';
-import { isKeyedResourceData } from '@flurryx/core';
-import { CACHE_NO_TIMEOUT, DEFAULT_CACHE_TTL_MS } from '@flurryx/core';
+import type { Signal } from "@angular/core";
+import { finalize, Observable, of, shareReplay, tap } from "rxjs";
+import type { ResourceState, StoreEnum, KeyedResourceKey } from "@flurryx/core";
+import { isKeyedResourceData } from "@flurryx/core";
+import { CACHE_NO_TIMEOUT, DEFAULT_CACHE_TTL_MS } from "@flurryx/core";
 
 type StoreWithSignal<TKey extends StoreEnum> = {
-  get: (key: TKey) => WritableSignal<ResourceState<unknown>> | undefined;
+  get: (key: TKey) => Signal<ResourceState<unknown>> | undefined;
 };
 
 interface CacheEntry {
@@ -65,7 +65,7 @@ function clearCacheEntry(
 
 function deriveResourceKey(args: unknown[]): KeyedResourceKey | undefined {
   const key = args[0];
-  if (typeof key === 'string' || typeof key === 'number') {
+  if (typeof key === "string" || typeof key === "number") {
     return key;
   }
   return undefined;
@@ -87,7 +87,7 @@ function isExpired(
 
 interface StoreContext {
   store: object;
-  storeSignal: WritableSignal<ResourceState<unknown>>;
+  storeSignal: Signal<ResourceState<unknown>>;
   currentState: ResourceState<unknown>;
 }
 
@@ -139,7 +139,7 @@ function getCacheContext(
   const isKeyedCall = keyedData !== undefined && resourceKey !== undefined;
 
   const keyedCacheKey = argsString;
-  const nonKeyedCacheKey = '__single__';
+  const nonKeyedCacheKey = "__single__";
   const runtimeCacheKey = isKeyedCall ? keyedCacheKey : nonKeyedCacheKey;
 
   const keyedCacheEntry = getCacheEntry(store, storeKey, keyedCacheKey);
@@ -148,7 +148,7 @@ function getCacheContext(
   return {
     isKeyedCall,
     resourceKey,
-    keyedData: keyedData as CacheContext['keyedData'],
+    keyedData: keyedData as CacheContext["keyedData"],
     runtimeCacheKey,
     keyedCacheEntry,
     nonKeyedCacheEntry,
@@ -161,8 +161,8 @@ function handleCacheErrors(
   context: CacheContext,
   currentState: ResourceState<unknown>
 ): void {
-  if (!context.keyedData && currentState.status === 'Error') {
-    clearCacheEntry(store, storeKey, '__single__');
+  if (!context.keyedData && currentState.status === "Error") {
+    clearCacheEntry(store, storeKey, "__single__");
   }
   if (context.keyedData && context.resourceKey !== undefined) {
     const status = (
@@ -170,7 +170,7 @@ function handleCacheErrors(
         status: Partial<Record<KeyedResourceKey, string>>;
       }
     ).status[context.resourceKey];
-    if (status === 'Error') {
+    if (status === "Error") {
       clearCacheEntry(store, storeKey, context.runtimeCacheKey);
     }
   }
@@ -210,7 +210,7 @@ function handleKeyedCache(
     clearCacheEntry(store, storeKey, runtimeCacheKey);
   }
 
-  if (!expired && status === 'Success' && entity !== undefined) {
+  if (!expired && status === "Success" && entity !== undefined) {
     if (returnObservable) {
       return { hit: true, value: of(entity) };
     }
@@ -237,7 +237,7 @@ function handleNonKeyedCache(
   returnObservable: boolean,
   currentState: ResourceState<unknown>,
   argsString: string,
-  storeSignal: WritableSignal<ResourceState<unknown>>
+  storeSignal: Signal<ResourceState<unknown>>
 ): CacheHitResult {
   const { nonKeyedCacheEntry, runtimeCacheKey } = context;
 
@@ -250,7 +250,7 @@ function handleNonKeyedCache(
   }
 
   const hasValidCacheState =
-    currentState?.status === 'Success' || currentState?.isLoading === true;
+    currentState?.status === "Success" || currentState?.isLoading === true;
 
   if (
     nonKeyedCacheEntry &&

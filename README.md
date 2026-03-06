@@ -164,7 +164,7 @@ interface ProductStoreConfig {
 export const ProductStore = Store.for<ProductStoreConfig>().build();
 ```
 
-That's it. The interface is type-only — zero runtime cost. The builder returns an `InjectionToken` with `providedIn: 'root'`. Every call to `store.get('LIST')` returns `WritableSignal<ResourceState<Product[]>>`, and invalid keys or mismatched types are caught at compile time.
+That's it. The interface is type-only — zero runtime cost. The builder returns an `InjectionToken` with `providedIn: 'root'`. Every call to `store.get('LIST')` returns `Signal<ResourceState<Product[]>>`, and invalid keys or mismatched types are caught at compile time.
 
 ### Step 2 — Create a facade
 
@@ -262,7 +262,7 @@ A slot starts as `{ data: undefined, isLoading: false, status: undefined, errors
 
 ### Store API
 
-The `Store` builder creates a store backed by `WritableSignal<ResourceState>` per slot. Three creation styles are available:
+The `Store` builder creates a store backed by `Signal<ResourceState>` per slot. Three creation styles are available:
 
 ```typescript
 // 1. Interface-based (recommended) — type-safe with zero boilerplate
@@ -289,7 +289,7 @@ Once injected, the store exposes these methods:
 
 | Method                    | Description                                                                           |
 | ------------------------- | ------------------------------------------------------------------------------------- |
-| `get(key)`                | Returns the `WritableSignal` for a slot                                               |
+| `get(key)`                | Returns the `Signal` for a slot                                               |
 | `update(key, partial)`    | Merges partial state (immutable spread)                                               |
 | `clear(key)`              | Resets a slot to its initial empty state                                              |
 | `clearAll()`              | Resets every slot                                                                     |
@@ -306,6 +306,10 @@ Once injected, the store exposes these methods:
 | `startKeyedLoading(key, resourceKey)`      | Sets loading for a single resource key |
 
 > Update hooks are stored in a `WeakMap` keyed by store instance, so garbage collection works naturally across multiple store lifetimes.
+
+#### Read-only signals
+
+`get(key)` returns a **read-only `Signal`**, not a `WritableSignal`. Consumers can read state but cannot mutate it directly — all writes must go through the store's own methods (`update`, `clear`, `startLoading`, …). This enforces strict encapsulation: the store is the single owner of its state, and external code can only observe it.
 
 ### Store Creation Styles
 
@@ -332,7 +336,7 @@ Type safety is fully enforced:
 ```typescript
 const store = inject(ChatStore);
 
-store.get('SESSIONS');                          // WritableSignal<ResourceState<ChatSession[]>>
+store.get('SESSIONS');                          // Signal<ResourceState<ChatSession[]>>
 store.update('SESSIONS', { data: [session] });  // ✅ type-checked
 store.update('SESSIONS', { data: 42 });         // ❌ TS error — number is not ChatSession[]
 store.get('INVALID');                           // ❌ TS error — key does not exist

@@ -1,4 +1,4 @@
-import { signal, WritableSignal } from "@angular/core";
+import { signal, type Signal, WritableSignal } from "@angular/core";
 import {
   isAnyKeyLoading,
   isKeyedResourceData,
@@ -47,7 +47,7 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     return sig as WritableSignal<TData[K]>;
   }
 
-  get<K extends keyof TData & string>(key: K): WritableSignal<TData[K]> {
+  get<K extends keyof TData & string>(key: K): Signal<TData[K]> {
     return this.getOrCreate(key);
   }
 

@@ -1,4 +1,4 @@
-import { signal, WritableSignal } from "@angular/core";
+import { signal, type Signal, WritableSignal } from "@angular/core";
 import {
   ResourceState,
   isAnyKeyLoading,
@@ -35,8 +35,8 @@ export abstract class BaseStore<
     updateHooksMap.set(this, new Map());
   }
 
-  get<K extends keyof TData>(key: K): WritableSignal<TData[K]> {
-    return this.signalsState.get(key.toString()) as WritableSignal<TData[K]>;
+  get<K extends keyof TData>(key: K): Signal<TData[K]> {
+    return this.signalsState.get(key.toString()) as Signal<TData[K]>;
   }
 
   onUpdate<K extends keyof TData>(

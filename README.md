@@ -57,8 +57,8 @@ export class ProductFacade {
   `,
 })
 export class ProductListComponent {
-  private readonly getProducts = inject(ProductFacade);
-  readonly productsState = this.getProducts.getProducts();
+  private readonly facade = inject(ProductFacade);
+  readonly productsState = this.facade.getProducts();
 }
 ```
 
@@ -241,11 +241,11 @@ export class ProductFacade {
   `,
 })
 export class ProductListComponent {
-  private readonly getProducts = inject(ProductFacade);
-  readonly productsState = this.getProducts.getProducts();
+  private readonly facade = inject(ProductFacade);
+  readonly productsState = this.facade.getProducts();
 
   constructor() {
-    this.getProducts.loadProducts();
+    this.facade.loadProducts();
   }
 }
 ```

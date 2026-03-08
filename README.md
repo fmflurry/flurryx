@@ -29,18 +29,36 @@ interface ProductStoreConfig {
 export const ProductStore = Store.for<ProductStoreConfig>().build();
 
 // Facade
-@SkipIfCached('LIST', (i) => i.store)
-@Loading('LIST', (i) => i.store)
-loadProducts() {
-  this.http.get<Product[]>('/api/products')
-    .pipe(syncToStore(this.store, 'LIST'))
-    .subscribe();
+@SkipIfCached("LIST", (i) => i.store)
+export class ProductFacade {
+  @Loading("LIST", (i) => i.store)
+  loadProducts() {
+    this.http
+      .get<Product[]>("/api/products")
+      .pipe(syncToStore(this.store, "LIST"))
+      .subscribe();
+  }
+
+  // Read signals from the facade
+  getProducts() {
+    return this.store.get("LIST");
+  }
 }
 
-// Component template — just read the signal
-@if (facade.list().isLoading) { <spinner /> }
-@for (product of facade.list().data; track product.id) {
-  <product-card [product]="product" />
+// Component — read the facade signal once, use it in the template
+@Component({
+  selector: "app-product-list",
+  template: `
+    @if (productsState().isLoading) {
+    <spinner />
+    } @for (product of productsState().data; track product.id) {
+    <product-card [product]="product" />
+    }
+  `,
+})
+export class ProductListComponent {
+  private readonly getProducts = inject(ProductFacade);
+  readonly productsState = this.getProducts.getProducts();
 }
 ```
 
@@ -180,24 +198,28 @@ export class ProductFacade {
   private readonly http = inject(HttpClient);
   readonly store = inject(ProductStore);
 
-  // Expose signals for templates
-  readonly list = this.store.get('LIST');
-  readonly detail = this.store.get('DETAIL');
+  getProducts() {
+    return this.store.get("LIST");
+  }
 
-  @SkipIfCached('LIST', (i: ProductFacade) => i.store)
-  @Loading('LIST', (i: ProductFacade) => i.store)
+  getProductDetail() {
+    return this.store.get("DETAIL");
+  }
+
+  @SkipIfCached("LIST", (i: ProductFacade) => i.store)
+  @Loading("LIST", (i: ProductFacade) => i.store)
   loadProducts() {
     this.http
       .get<Product[]>("/api/products")
-      .pipe(syncToStore(this.store, 'LIST'))
+      .pipe(syncToStore(this.store, "LIST"))
       .subscribe();
   }
 
-  @Loading('DETAIL', (i: ProductFacade) => i.store)
+  @Loading("DETAIL", (i: ProductFacade) => i.store)
   loadProduct(id: string) {
     this.http
       .get<Product>(`/api/products/${id}`)
-      .pipe(syncToStore(this.store, 'DETAIL'))
+      .pipe(syncToStore(this.store, "DETAIL"))
       .subscribe();
   }
 }
@@ -208,21 +230,22 @@ export class ProductFacade {
 ```typescript
 @Component({
   template: `
-    @if (facade.list().isLoading) {
+    @if (productsState().isLoading) {
     <spinner />
-    } @if (facade.list().status === 'Success') { @for (product of
-    facade.list().data; track product.id) {
+    } @if (productsState().status === 'Success') { @for (product of
+    productsState().data; track product.id) {
     <product-card [product]="product" />
-    } } @if (facade.list().status === 'Error') {
-    <error-banner [errors]="facade.list().errors" />
+    } } @if (productsState().status === 'Error') {
+    <error-banner [errors]="productsState().errors" />
     }
   `,
 })
 export class ProductListComponent {
-  readonly facade = inject(ProductFacade);
+  private readonly getProducts = inject(ProductFacade);
+  readonly productsState = this.getProducts.getProducts();
 
   constructor() {
-    this.facade.loadProducts();
+    this.getProducts.loadProducts();
   }
 }
 ```

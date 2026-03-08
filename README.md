@@ -29,8 +29,9 @@ interface ProductStoreConfig {
 export const ProductStore = Store.for<ProductStoreConfig>().build();
 
 // Facade
-@SkipIfCached("LIST", (i) => i.store)
+@Injectable()
 export class ProductFacade {
+  @SkipIfCached("LIST", (i) => i.store)
   @Loading("LIST", (i) => i.store)
   loadProducts() {
     this.http
@@ -193,7 +194,7 @@ import { Injectable, inject } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
 import { syncToStore, SkipIfCached, Loading } from "flurryx";
 
-@Injectable({ providedIn: "root" })
+@Injectable()
 export class ProductFacade {
   private readonly http = inject(HttpClient);
   readonly store = inject(ProductStore);

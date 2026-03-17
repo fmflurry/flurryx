@@ -57,9 +57,13 @@ export class ProductFacade {
     }
   `,
 })
-export class ProductListComponent {
+export class ProductListComponent implements OnInit {
   private readonly facade = inject(ProductFacade);
   readonly productsState = this.facade.getProducts();
+
+  ngOnInit() {
+    this.facade.loadProducts();
+  }
 }
 ```
 

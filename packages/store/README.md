@@ -138,7 +138,22 @@ export class InvoiceFacade {
 
 ## Store Mirroring
 
-The store builder supports `.mirror()` and `.mirrorKeyed()` for declarative cross-store synchronization. See the [root README](../../README.md#store-mirroring) for full documentation.
+The store builder supports `.mirror()`, `.mirrorSelf()`, and `.mirrorKeyed()` for declarative synchronization.
+
+Use `.mirrorSelf(sourceKey, targetKey)` when two slots inside the same store should stay in sync:
+
+```typescript
+interface SessionStoreConfig {
+  CUSTOMER_DETAILS: Customer;
+  CUSTOMER_SNAPSHOT: Customer;
+}
+
+export const SessionStore = Store.for<SessionStoreConfig>()
+  .mirrorSelf('CUSTOMER_DETAILS', 'CUSTOMER_SNAPSHOT')
+  .build();
+```
+
+See the [root README](../../README.md#store-mirroring) for full mirroring documentation and more examples.
 
 ## License
 

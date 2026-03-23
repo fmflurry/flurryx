@@ -91,6 +91,7 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
 - [Clearing Store Data](#clearing-store-data)
 - [Store Mirroring](#store-mirroring)
   - [Builder .mirror()](#builder-mirror)
+  - [Builder .mirrorSelf()](#builder-mirrorself)
   - [Builder .mirrorKeyed()](#builder-mirrorkeyed)
   - [mirrorKey](#mirrorkey)
   - [collectKeyed](#collectkeyed)
@@ -786,6 +787,45 @@ export const SessionStore = Store.for<{ ARTICLES: Item[] }>()
 ```
 
 The builder calls `inject()` under the hood, so source stores are resolved through Angular's DI. Everything — data, loading, status, errors — is mirrored automatically. No manual cleanup needed; the mirrors live as long as the store.
+
+### Builder .mirrorSelf()
+
+Use `.mirrorSelf()` when one slot in a store should mirror another slot in the same store. It is useful for aliases, local snapshots, or secondary slots that should stay in sync with a primary slot without wiring `onUpdate` manually.
+
+```typescript
+interface SessionStoreConfig {
+  CUSTOMER_DETAILS: Customer;
+  CUSTOMER_SNAPSHOT: Customer;
+}
+
+export const SessionStore = Store.for<SessionStoreConfig>()
+  .mirrorSelf('CUSTOMER_DETAILS', 'CUSTOMER_SNAPSHOT')
+  .build();
+```
+
+It mirrors the full resource state one way — `data`, `isLoading`, `status`, and `errors` all flow from the source key to the target key. The target key must be different from the source key.
+
+Because it listens to updates on the built store itself, `.mirrorSelf()` also reacts when the source key is updated by another mirror:
+
+```typescript
+interface CustomerStoreConfig {
+  CUSTOMERS: Customer[];
+}
+
+interface SessionStoreConfig {
+  CUSTOMERS: Customer[];
+  CUSTOMER_COPY: Customer[];
+}
+
+export const CustomerStore = Store.for<CustomerStoreConfig>().build();
+
+export const SessionStore = Store.for<SessionStoreConfig>()
+  .mirror(CustomerStore, 'CUSTOMERS')
+  .mirrorSelf('CUSTOMERS', 'CUSTOMER_COPY')
+  .build();
+```
+
+`.mirrorSelf()` is available on all builder styles. For fluent builders, declare both slots first, then chain `.mirrorSelf(sourceKey, targetKey)` before `.build()`.
 
 ### Builder .mirrorKeyed()
 

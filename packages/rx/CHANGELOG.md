@@ -1,5 +1,12 @@
 # @flurryx/rx
 
+## 0.8.1
+
+### Patch Changes
+
+- Updated dependencies [fd8bd49]
+  - @flurryx/store@0.8.1
+
 ## 1.0.0
 
 ### Major Changes

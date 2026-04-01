@@ -4,9 +4,11 @@ vi.mock("@angular/core", async () => {
   return import("../__mocks__/@angular/core");
 });
 
-import { inject, _resetProviders } from "../__mocks__/@angular/core";
+import { _resetProviders } from "../__mocks__/@angular/core";
 import { Store } from "../store-builder";
-import type { ConfigToData, IStore } from "../types";
+import type { IStore, ConfigToData } from "../types";
+import type { InjectionToken } from "@angular/core";
+import { createFromToken, injectFromMock } from "./test-helpers";
 
 interface Customer {
   id: string;
@@ -17,11 +19,7 @@ type CustomerStoreConfig = Record<"CUSTOMERS", Customer[]>;
 
 const CustomerStore = Store.for<CustomerStoreConfig>().build();
 
-type TokenWithFactory<T> = {
-  options?: {
-    factory: () => T;
-  };
-};
+type SourceTargetData = ConfigToData<Record<"SOURCE" | "TARGET", string>>;
 
 type ConstrainedMirrorSelfStageOne = {
   resource: (key: "SOURCE" | "TARGET") => {
@@ -38,29 +36,23 @@ type ConstrainedMirrorSelfStageTwo = {
 type ConstrainedMirrorSelfFinalStage = {
   mirrorSelf: (
     sourceKey: "SOURCE" | "TARGET",
-    targetKey: "SOURCE" | "TARGET",
+    targetKey: "SOURCE" | "TARGET"
   ) => {
-    build: () => TokenWithFactory<
-      IStore<ConfigToData<Record<"SOURCE" | "TARGET", string>>>
-    >;
+    build: () => InjectionToken<IStore<SourceTargetData>>;
   };
 };
 
-function createStore<T>(token: TokenWithFactory<T>): T {
-  return token.options!.factory();
-}
-
 function createConstrainedMirrorSelfToken(
   sourceKey: "SOURCE" | "TARGET",
-  targetKey: "SOURCE" | "TARGET",
-): TokenWithFactory<IStore<ConfigToData<Record<"SOURCE" | "TARGET", string>>>> {
+  targetKey: "SOURCE" | "TARGET"
+) {
   const SessionEnum = {
     SOURCE: "SOURCE",
     TARGET: "TARGET",
   } as const;
 
   const stageOne = Store.for(
-    SessionEnum,
+    SessionEnum
   ) as unknown as ConstrainedMirrorSelfStageOne;
   const stageTwo = stageOne.resource("SOURCE").as();
   const finalStage = stageTwo.resource("TARGET").as();
@@ -82,11 +74,7 @@ describe("Store builder .mirrorSelf()", () => {
         .mirrorSelf("SOURCE", "TARGET")
         .build();
 
-      const sessionStore = createStore(
-        SessionStore as unknown as TokenWithFactory<
-          IStore<ConfigToData<Record<"SOURCE" | "TARGET", string>>>
-        >,
-      );
+      const sessionStore = createFromToken(SessionStore);
 
       sessionStore.update("SOURCE", {
         data: "hello",
@@ -107,11 +95,7 @@ describe("Store builder .mirrorSelf()", () => {
         .mirrorSelf("SOURCE", "TARGET")
         .build();
 
-      const sessionStore = createStore(
-        SessionStore as unknown as TokenWithFactory<
-          IStore<ConfigToData<Record<"SOURCE" | "TARGET", string>>>
-        >,
-      );
+      const sessionStore = createFromToken(SessionStore);
 
       sessionStore.update("SOURCE", {
         data: "hello",
@@ -141,14 +125,8 @@ describe("Store builder .mirrorSelf()", () => {
         .mirrorSelf("CUSTOMERS", "CUSTOMER_COPY")
         .build();
 
-      const customerStore = inject(CustomerStore as never) as IStore<
-        ConfigToData<CustomerStoreConfig>
-      >;
-      const sessionStore = createStore(
-        SessionStore as unknown as TokenWithFactory<
-          IStore<ConfigToData<SessionStoreConfig>>
-        >,
-      );
+      const customerStore = injectFromMock(CustomerStore);
+      const sessionStore = createFromToken(SessionStore);
 
       customerStore.update("CUSTOMERS", {
         data: [{ id: "c1", name: "Alice" }],
@@ -172,11 +150,7 @@ describe("Store builder .mirrorSelf()", () => {
         .mirrorSelf("SOURCE", "TARGET")
         .build();
 
-      const sessionStore = createStore(
-        SessionStore as unknown as TokenWithFactory<
-          IStore<ConfigToData<SessionStoreConfig>>
-        >,
-      );
+      const sessionStore = createFromToken(SessionStore);
 
       sessionStore.update("SOURCE", {
         isLoading: true,
@@ -198,13 +172,9 @@ describe("Store builder .mirrorSelf()", () => {
         .mirrorSelf("SOURCE", "SOURCE")
         .build();
 
-      expect(() =>
-        createStore(
-          SessionStore as unknown as TokenWithFactory<
-            IStore<ConfigToData<SessionStoreConfig>>
-          >,
-        ),
-      ).toThrowError("mirrorSelf source and target keys must be different");
+      expect(() => createFromToken(SessionStore)).toThrowError(
+        "mirrorSelf source and target keys must be different"
+      );
     });
   });
 
@@ -212,7 +182,7 @@ describe("Store builder .mirrorSelf()", () => {
     it("should mirror on enum-constrained builders", () => {
       const SessionStore = createConstrainedMirrorSelfToken("SOURCE", "TARGET");
 
-      const sessionStore = createStore(SessionStore);
+      const sessionStore = createFromToken(SessionStore);
 
       sessionStore.update("SOURCE", {
         data: "value-from-constrained-builder",
@@ -220,7 +190,7 @@ describe("Store builder .mirrorSelf()", () => {
       });
 
       expect(sessionStore.get("TARGET")().data).toBe(
-        "value-from-constrained-builder",
+        "value-from-constrained-builder"
       );
       expect(sessionStore.get("TARGET")().status).toBe("Success");
     });

@@ -1,6 +1,6 @@
 {
   "name": "@flurryx/store",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Signal-first reactive store for Angular",
   "license": "MIT",
   "type": "module",

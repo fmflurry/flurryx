@@ -1,5 +1,11 @@
 # @flurryx/store
 
+## 0.8.1
+
+### Patch Changes
+
+- fd8bd49: Add a global `clearAllStores()` helper to reset all tracked store instances for logout and tenant-switch flows.
+
 ## 1.0.0
 
 ### Major Changes

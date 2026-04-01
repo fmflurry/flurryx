@@ -1,6 +1,12 @@
 import type { Signal } from "@angular/core";
 import type { ResourceState, KeyedResourceKey } from "@flurryx/core";
 
+export type StoreDataShape<TData> = {
+  [K in keyof TData]: ResourceState<unknown>;
+};
+
+export type StoreKey<TData> = keyof TData & string;
+
 /**
  * Phantom-typed marker for a store resource slot.
  * Carries type information at compile time with zero runtime cost.
@@ -37,37 +43,34 @@ export type InferData<TConfig extends StoreConfig> = {
  * Maps a plain config interface to ResourceState-wrapped data.
  * e.g. { SESSIONS: ChatSession[] } -> { SESSIONS: ResourceState<ChatSession[]> }
  */
-export type ConfigToData<TConfig extends Record<string, unknown>> = {
+export type ConfigToData<TConfig extends object> = {
   [K in keyof TConfig & string]: ResourceState<TConfig[K]>;
 };
 
 /**
  * Shared store interface implemented by both BaseStore and LazyStore.
  */
-export interface IStore<TData extends Record<string, ResourceState<unknown>>> {
-  get<K extends keyof TData & string>(key: K): Signal<TData[K]>;
-  update<K extends keyof TData & string>(
-    key: K,
-    newState: Partial<TData[K]>
-  ): void;
-  clear<K extends keyof TData & string>(key: K): void;
+export interface IStore<TData extends StoreDataShape<TData>> {
+  get<K extends StoreKey<TData>>(key: K): Signal<TData[K]>;
+  update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void;
+  clear<K extends StoreKey<TData>>(key: K): void;
   clearAll(): void;
-  startLoading<K extends keyof TData & string>(key: K): void;
-  stopLoading<K extends keyof TData & string>(key: K): void;
-  updateKeyedOne<K extends keyof TData & string>(
+  startLoading<K extends StoreKey<TData>>(key: K): void;
+  stopLoading<K extends StoreKey<TData>>(key: K): void;
+  updateKeyedOne<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey,
     entity: unknown
   ): void;
-  clearKeyedOne<K extends keyof TData & string>(
+  clearKeyedOne<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey
   ): void;
-  startKeyedLoading<K extends keyof TData & string>(
+  startKeyedLoading<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey
   ): void;
-  onUpdate<K extends keyof TData & string>(
+  onUpdate<K extends StoreKey<TData>>(
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void
   ): () => void;

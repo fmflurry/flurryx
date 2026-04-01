@@ -4,7 +4,7 @@ import type {
   KeyedResourceData,
 } from '@flurryx/core';
 import { createKeyedResourceData, isAnyKeyLoading } from '@flurryx/core';
-import type { IStore } from './types';
+import type { IStore, StoreDataShape, StoreKey } from './types';
 
 export interface CollectKeyedOptions<TEntity> {
   extractId: (data: TEntity | undefined) => KeyedResourceKey | undefined;
@@ -28,21 +28,21 @@ export interface CollectKeyedOptions<TEntity> {
  * @returns Cleanup function to stop collecting
  */
 export function collectKeyed<
-  TSource extends Record<string, ResourceState<unknown>>,
-  TTarget extends Record<string, ResourceState<unknown>>,
+  TSource extends StoreDataShape<TSource>,
+  TTarget extends StoreDataShape<TTarget>,
   TEntity = unknown,
 >(
   source: IStore<TSource>,
-  sourceKey: keyof TSource & string,
+  sourceKey: StoreKey<TSource>,
   target: IStore<TTarget>,
-  targetKeyOrOptions?: (keyof TTarget & string) | CollectKeyedOptions<TEntity>,
+  targetKeyOrOptions?: StoreKey<TTarget> | CollectKeyedOptions<TEntity>,
   options?: CollectKeyedOptions<TEntity>,
 ): () => void {
   const resolvedTargetKey = (
     typeof targetKeyOrOptions === 'string'
       ? targetKeyOrOptions
       : sourceKey
-  ) as keyof TTarget & string;
+  ) as StoreKey<TTarget>;
 
   const resolvedOptions = (
     typeof targetKeyOrOptions === 'object' ? targetKeyOrOptions : options
@@ -51,7 +51,7 @@ export function collectKeyed<
   // Initialize target with empty keyed resource data
   target.update(resolvedTargetKey, {
     data: createKeyedResourceData(),
-  } as Partial<TTarget[keyof TTarget & string]>);
+  } as Partial<TTarget[StoreKey<TTarget>]>);
 
   let previousId: KeyedResourceKey | undefined;
 
@@ -84,7 +84,7 @@ export function collectKeyed<
         data: updatedKeyed,
         isLoading: isAnyKeyLoading(newIsLoading),
         status: 'Success',
-      } as Partial<TTarget[keyof TTarget & string]>);
+      } as Partial<TTarget[StoreKey<TTarget>]>);
 
       previousId = currentId;
     } else if (resourceState.status === 'Error' && currentId !== undefined) {
@@ -102,7 +102,7 @@ export function collectKeyed<
       target.update(resolvedTargetKey, {
         data: updatedKeyed,
         isLoading: isAnyKeyLoading(newIsLoading),
-      } as Partial<TTarget[keyof TTarget & string]>);
+      } as Partial<TTarget[StoreKey<TTarget>]>);
 
       previousId = currentId;
     } else if (resourceState.data === undefined && previousId !== undefined) {
@@ -122,7 +122,7 @@ export function collectKeyed<
       target.update(resolvedTargetKey, {
         data: updatedKeyed,
         isLoading: isAnyKeyLoading(remainingLoading),
-      } as Partial<TTarget[keyof TTarget & string]>);
+      } as Partial<TTarget[StoreKey<TTarget>]>);
 
       previousId = undefined;
     } else if (resourceState.isLoading && currentId !== undefined) {
@@ -138,7 +138,7 @@ export function collectKeyed<
       target.update(resolvedTargetKey, {
         data: updatedKeyed,
         isLoading: true,
-      } as Partial<TTarget[keyof TTarget & string]>);
+      } as Partial<TTarget[StoreKey<TTarget>]>);
 
       previousId = currentId;
     }

@@ -16,7 +16,13 @@ export {
 } from "@flurryx/core";
 
 // @flurryx/store
-export { BaseStore, Store, mirrorKey, collectKeyed } from "@flurryx/store";
+export {
+  BaseStore,
+  Store,
+  clearAllStores,
+  mirrorKey,
+  collectKeyed,
+} from "@flurryx/store";
 export type { MirrorOptions, CollectKeyedOptions } from "@flurryx/store";
 
 // @flurryx/rx

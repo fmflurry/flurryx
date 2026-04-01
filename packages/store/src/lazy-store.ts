@@ -6,7 +6,8 @@ import {
   type ResourceState,
   type KeyedResourceKey,
 } from "@flurryx/core";
-import type { IStore } from "./types";
+import type { IStore, StoreDataShape, StoreKey } from "./types";
+import { trackStore } from "./store-registry";
 
 type UpdateCallback = (
   nextState: ResourceState<unknown>,
@@ -27,7 +28,7 @@ function createDefaultState<T>(): ResourceState<T> {
  * Used by the `Store.for<Config>().build()` API where keys are
  * known only at the type level (no runtime enum).
  */
-export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
+export class LazyStore<TData extends StoreDataShape<TData>>
   implements IStore<TData>
 {
   private readonly signals = new Map<
@@ -36,7 +37,11 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
   >();
   private readonly hooks = new Map<string, UpdateCallback[]>();
 
-  private getOrCreate<K extends keyof TData & string>(
+  constructor() {
+    trackStore(this);
+  }
+
+  private getOrCreate<K extends StoreKey<TData>>(
     key: K
   ): WritableSignal<TData[K]> {
     let sig = this.signals.get(key);
@@ -47,14 +52,11 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     return sig as WritableSignal<TData[K]>;
   }
 
-  get<K extends keyof TData & string>(key: K): Signal<TData[K]> {
+  get<K extends StoreKey<TData>>(key: K): Signal<TData[K]> {
     return this.getOrCreate(key);
   }
 
-  update<K extends keyof TData & string>(
-    key: K,
-    newState: Partial<TData[K]>
-  ): void {
+  update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void {
     const sig = this.getOrCreate(key);
     const previousState = sig();
     sig.update((state) => ({ ...state, ...newState }));
@@ -62,7 +64,7 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     this.notifyHooks(key, nextState, previousState);
   }
 
-  clear<K extends keyof TData & string>(key: K): void {
+  clear<K extends StoreKey<TData>>(key: K): void {
     const sig = this.getOrCreate(key);
     const previousState = sig();
     sig.set(createDefaultState() as TData[K]);
@@ -72,11 +74,11 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
 
   clearAll(): void {
     for (const key of this.signals.keys()) {
-      this.clear(key as keyof TData & string);
+      this.clear(key as StoreKey<TData>);
     }
   }
 
-  startLoading<K extends keyof TData & string>(key: K): void {
+  startLoading<K extends StoreKey<TData>>(key: K): void {
     const sig = this.getOrCreate(key);
     sig.update(
       (state) =>
@@ -89,7 +91,7 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     );
   }
 
-  stopLoading<K extends keyof TData & string>(key: K): void {
+  stopLoading<K extends StoreKey<TData>>(key: K): void {
     const sig = this.getOrCreate(key);
     sig.update(
       (state) =>
@@ -102,7 +104,7 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     );
   }
 
-  updateKeyedOne<K extends keyof TData & string>(
+  updateKeyedOne<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey,
     entity: unknown
@@ -132,7 +134,7 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     } as Partial<TData[K]>);
   }
 
-  clearKeyedOne<K extends keyof TData & string>(
+  clearKeyedOne<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
@@ -180,7 +182,7 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     this.notifyHooks(key, updatedState, previousState);
   }
 
-  startKeyedLoading<K extends keyof TData & string>(
+  startKeyedLoading<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
@@ -227,7 +229,7 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     this.notifyHooks(key, updatedState, previousState);
   }
 
-  onUpdate<K extends keyof TData & string>(
+  onUpdate<K extends StoreKey<TData>>(
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void
   ): () => void {
@@ -249,7 +251,7 @@ export class LazyStore<TData extends Record<string, ResourceState<unknown>>>
     };
   }
 
-  private notifyHooks<K extends keyof TData & string>(
+  private notifyHooks<K extends StoreKey<TData>>(
     key: K,
     nextState: TData[K],
     previousState: TData[K]

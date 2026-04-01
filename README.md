@@ -648,9 +648,22 @@ store.clear('LIST');
 
 // Clear every slot in the store
 store.clearAll();
+
+// Clear every tracked store instance in the app
+clearAllStores();
 ```
 
 This is the right choice when the slot holds a single value (e.g. `Product`, `User[]`).
+
+For app-wide cache resets such as logout or tenant switching, use the global helper:
+
+```typescript
+import { clearAllStores } from "flurryx";
+
+logout() {
+  clearAllStores();
+}
+```
 
 ### Per-key clearing for keyed resources
 
@@ -688,7 +701,8 @@ export class InvoiceFacade {
 | Method | Scope | Use when |
 |---|---|---|
 | `clear(key)` | Entire slot | Logging out, resetting a form, full refresh |
-| `clearAll()` | Every slot | Session teardown |
+| `clearAll()` | Every slot in one store | Reset one feature store |
+| `clearAllStores()` | Every tracked store instance | Logout, tenant switch, full app cache reset |
 | `clearKeyedOne(key, resourceKey)` | Single entity in a keyed slot | Deleting or invalidating one cached item |
 
 ---

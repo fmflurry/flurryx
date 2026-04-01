@@ -316,7 +316,8 @@ Once injected, the store exposes these methods:
 | `get(key)`                | Returns the `Signal` for a slot                                               |
 | `update(key, partial)`    | Merges partial state (immutable spread)                                               |
 | `clear(key)`              | Resets a slot to its initial empty state                                              |
-| `clearAll()`              | Resets every slot                                                                     |
+| `clearAll()`              | Resets every slot in one store                                                        |
+| `clearAllStores()`        | Resets every tracked store instance                                                   |
 | `startLoading(key)`       | Sets `isLoading: true`, clears `status` and `errors`                                  |
 | `stopLoading(key)`        | Sets `isLoading: false`, clears `status` and `errors`                                 |
 | `onUpdate(key, callback)` | Registers a listener fired after `update` or `clear`. Returns an unsubscribe function |

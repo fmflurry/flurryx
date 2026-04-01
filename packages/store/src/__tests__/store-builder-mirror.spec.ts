@@ -6,9 +6,9 @@ vi.mock("@angular/core", async () => {
   return import("../__mocks__/@angular/core");
 });
 
-import { inject, _resetProviders } from "../__mocks__/@angular/core";
+import { _resetProviders } from "../__mocks__/@angular/core";
 import { Store } from "../store-builder";
-import type { ResourceState } from "@flurryx/core";
+import { createFromToken, injectFromMock } from "./test-helpers";
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -66,8 +66,8 @@ describe("Store builder .mirror() — unconstrained builder", () => {
       .build();
 
     // Resolve source store and session store through mock DI
-    const customerStore = inject(CustomerStore);
-    const sessionStore = SessionStore.options!.factory();
+    const customerStore = injectFromMock(CustomerStore);
+    const sessionStore = createFromToken(SessionStore);
 
     customerStore.update("CUSTOMERS", {
       data: [{ id: "1", name: "Alice" }],
@@ -85,8 +85,8 @@ describe("Store builder .mirror() — unconstrained builder", () => {
       .mirror(ItemStore, "ITEMS", "ARTICLES")
       .build();
 
-    const itemStore = inject(ItemStore);
-    const sessionStore = SessionStore.options!.factory();
+    const itemStore = injectFromMock(ItemStore);
+    const sessionStore = createFromToken(SessionStore);
 
     itemStore.update("ITEMS", {
       data: [{ sku: "A1", qty: 5 }],
@@ -106,9 +106,9 @@ describe("Store builder .mirror() — unconstrained builder", () => {
       .mirror(OrderStore, "ORDERS")
       .build();
 
-    const customerStore = inject(CustomerStore);
-    const orderStore = inject(OrderStore);
-    const sessionStore = SessionStore.options!.factory();
+    const customerStore = injectFromMock(CustomerStore);
+    const orderStore = injectFromMock(OrderStore);
+    const sessionStore = createFromToken(SessionStore);
 
     customerStore.update("CUSTOMERS", {
       data: [{ id: "1", name: "Alice" }],
@@ -134,8 +134,8 @@ describe("Store builder .mirror() — unconstrained builder", () => {
       .mirror(CustomerStore, "CUSTOMERS")
       .build();
 
-    const customerStore = inject(CustomerStore);
-    const sessionStore = SessionStore.options!.factory();
+    const customerStore = injectFromMock(CustomerStore);
+    const sessionStore = createFromToken(SessionStore);
 
     customerStore.update("CUSTOMERS", { isLoading: true });
 
@@ -148,8 +148,8 @@ describe("Store builder .mirror() — unconstrained builder", () => {
       .mirror(CustomerStore, "CUSTOMERS")
       .build();
 
-    const customerStore = inject(CustomerStore);
-    const sessionStore = SessionStore.options!.factory();
+    const customerStore = injectFromMock(CustomerStore);
+    const sessionStore = createFromToken(SessionStore);
 
     customerStore.update("CUSTOMERS", {
       status: "Error",
@@ -169,8 +169,8 @@ describe("Store builder .mirror() — unconstrained builder", () => {
       .mirror(CustomerStore, "CUSTOMERS")
       .build();
 
-    const customerStore = inject(CustomerStore);
-    const sessionStore = SessionStore.options!.factory();
+    const customerStore = injectFromMock(CustomerStore);
+    const sessionStore = createFromToken(SessionStore);
 
     // Mirror works
     customerStore.update("CUSTOMERS", {
@@ -201,8 +201,8 @@ describe("Store builder .mirror() — interface-based builder", () => {
       .mirror(CustomerStore, "CUSTOMERS")
       .build();
 
-    const customerStore = inject(CustomerStore);
-    const sessionStore = SessionStore.options!.factory();
+    const customerStore = injectFromMock(CustomerStore);
+    const sessionStore = createFromToken(SessionStore);
 
     customerStore.update("CUSTOMERS", {
       data: [{ id: "1", name: "Alice" }],
@@ -220,9 +220,9 @@ describe("Store builder .mirror() — interface-based builder", () => {
       .mirror(OrderStore, "ORDERS")
       .build();
 
-    const customerStore = inject(CustomerStore);
-    const orderStore = inject(OrderStore);
-    const sessionStore = SessionStore.options!.factory();
+    const customerStore = injectFromMock(CustomerStore);
+    const orderStore = injectFromMock(OrderStore);
+    const sessionStore = createFromToken(SessionStore);
 
     customerStore.update("CUSTOMERS", {
       data: [{ id: "1", name: "Alice" }],
@@ -248,8 +248,8 @@ describe("Store builder .mirror() — interface-based builder", () => {
       .mirror(ItemStore, "ITEMS", "ARTICLES")
       .build();
 
-    const itemStore = inject(ItemStore);
-    const aggStore = AggregateStore.options!.factory();
+    const itemStore = injectFromMock(ItemStore);
+    const aggStore = createFromToken(AggregateStore);
 
     itemStore.update("ITEMS", {
       data: [{ sku: "X1", qty: 10 }],
@@ -280,9 +280,9 @@ describe("Store builder .mirror() — constrained builder", () => {
       .mirror(OrderStore, "ORDERS")
       .build();
 
-    const customerStore = inject(CustomerStore);
-    const orderStore = inject(OrderStore);
-    const sessionStore = SessionStore.options!.factory();
+    const customerStore = injectFromMock(CustomerStore);
+    const orderStore = injectFromMock(OrderStore);
+    const sessionStore = createFromToken(SessionStore);
 
     customerStore.update("CUSTOMERS", {
       data: [{ id: "1", name: "Alice" }],

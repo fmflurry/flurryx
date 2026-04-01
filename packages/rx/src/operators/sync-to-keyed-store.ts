@@ -1,5 +1,5 @@
 import { finalize, Observable, take, tap } from "rxjs";
-import type { IStore } from "@flurryx/store";
+import type { BaseStore, IStore } from "@flurryx/store";
 import {
   createKeyedResourceData,
   isAnyKeyLoading,
@@ -14,6 +14,11 @@ import {
   type ErrorNormalizer,
 } from "../error/error-normalizer";
 import type { SyncToStoreOptions } from "./sync-to-store";
+
+interface SyncToKeyedStoreRuntimeStore {
+  get(key: PropertyKey): () => ResourceState<unknown>;
+  update(key: PropertyKey, newState: unknown): void;
+}
 
 export interface SyncToKeyedStoreOptions<R, TValue> extends SyncToStoreOptions {
   mapResponse?: (response: R) => TValue;
@@ -32,8 +37,22 @@ function withoutKey<TKey extends KeyedResourceKey, TValue>(
 }
 
 export function syncToKeyedStore<
-  TData extends Record<string, ResourceState<unknown>>,
-  TStoreKey extends keyof TData & string,
+  TEnum extends Record<string, string | number>,
+  TData extends { [K in keyof TEnum]: ResourceState<unknown> },
+  TStoreKey extends keyof TData,
+  TKey extends KeyedResourceKey,
+  TValue,
+  R = TValue
+>(
+  store: BaseStore<TEnum, TData>,
+  storeKey: TStoreKey,
+  resourceKey: TKey,
+  options?: SyncToKeyedStoreOptions<R, TValue>
+): (source: Observable<R>) => Observable<R>;
+
+export function syncToKeyedStore<
+  TData extends { [K in keyof TData]: ResourceState<unknown> },
+  TStoreKey extends keyof TData,
   TKey extends KeyedResourceKey,
   TValue,
   R = TValue
@@ -41,91 +60,103 @@ export function syncToKeyedStore<
   store: IStore<TData>,
   storeKey: TStoreKey,
   resourceKey: TKey,
-  options: SyncToKeyedStoreOptions<R, TValue> = {
+  options?: SyncToKeyedStoreOptions<R, TValue>
+): (source: Observable<R>) => Observable<R>;
+
+export function syncToKeyedStore(
+  store: unknown,
+  storeKey: PropertyKey,
+  resourceKey: KeyedResourceKey,
+  options: SyncToKeyedStoreOptions<unknown, unknown> = {
     completeOnFirstEmission: true,
   }
 ) {
   const { completeOnFirstEmission, callbackAfterComplete, mapResponse } =
     options;
   const normalizeError = options.errorNormalizer ?? defaultErrorNormalizer;
+  const syncStore = store as SyncToKeyedStoreRuntimeStore;
 
-  return (source: Observable<R>) => {
+  return (source: Observable<unknown>) => {
     let pipeline = source.pipe(
       tap({
-        next: (response: R) => {
+        next: (response: unknown) => {
           const value = mapResponse
             ? mapResponse(response)
-            : (response as unknown as TValue);
+            : response;
 
-          const storeSignal = store.get(storeKey);
+          const storeSignal = syncStore.get(storeKey);
           const state = storeSignal();
           const data =
-            (state.data as KeyedResourceData<TKey, TValue> | undefined) ??
-            createKeyedResourceData<TKey, TValue>();
+            (state.data as
+              | KeyedResourceData<KeyedResourceKey, unknown>
+              | undefined) ??
+            createKeyedResourceData<KeyedResourceKey, unknown>();
 
           const nextIsLoading = {
             ...data.isLoading,
             [resourceKey]: false,
-          } as Partial<Record<TKey, boolean>>;
+          } as Partial<Record<KeyedResourceKey, boolean>>;
 
-          const nextStatus: Partial<Record<TKey, ResourceStatus>> = {
+          const nextStatus: Partial<Record<KeyedResourceKey, ResourceStatus>> = {
             ...data.status,
-            [resourceKey]: "Success",
+            [resourceKey]: "Success" as ResourceStatus,
           };
 
-          const nextData: KeyedResourceData<TKey, TValue> = {
+          const nextData: KeyedResourceData<KeyedResourceKey, unknown> = {
             ...data,
             entities: {
               ...data.entities,
               [resourceKey]: value,
-            } as Partial<Record<TKey, TValue>>,
+            } as Partial<Record<KeyedResourceKey, unknown>>,
             isLoading: nextIsLoading,
             status: nextStatus,
             errors: withoutKey(data.errors, resourceKey),
           };
 
-          store.update(storeKey, {
+          syncStore.update(storeKey, {
             data: nextData,
             isLoading: isAnyKeyLoading(nextIsLoading),
             status: undefined,
             errors: undefined,
-          } as Partial<TData[typeof storeKey]>);
+          });
         },
         error: (error: unknown) => {
-          const storeSignal = store.get(storeKey);
+          const storeSignal = syncStore.get(storeKey);
           const state = storeSignal();
           const data =
-            (state.data as KeyedResourceData<TKey, TValue> | undefined) ??
-            createKeyedResourceData<TKey, TValue>();
+            (state.data as
+              | KeyedResourceData<KeyedResourceKey, unknown>
+              | undefined) ??
+            createKeyedResourceData<KeyedResourceKey, unknown>();
 
           const nextIsLoading = {
             ...data.isLoading,
             [resourceKey]: false,
-          } as Partial<Record<TKey, boolean>>;
+          } as Partial<Record<KeyedResourceKey, boolean>>;
 
-          const nextStatus: Partial<Record<TKey, ResourceStatus>> = {
+          const nextStatus: Partial<Record<KeyedResourceKey, ResourceStatus>> = {
             ...data.status,
-            [resourceKey]: "Error",
+            [resourceKey]: "Error" as ResourceStatus,
           };
 
-          const nextErrors: Partial<Record<TKey, ResourceErrors>> = {
+          const nextErrors: Partial<Record<KeyedResourceKey, ResourceErrors>> = {
             ...data.errors,
             [resourceKey]: normalizeError(error),
           };
 
-          const nextData: KeyedResourceData<TKey, TValue> = {
+          const nextData: KeyedResourceData<KeyedResourceKey, unknown> = {
             ...data,
             isLoading: nextIsLoading,
             status: nextStatus,
             errors: nextErrors,
           };
 
-          store.update(storeKey, {
+          syncStore.update(storeKey, {
             data: nextData,
             isLoading: isAnyKeyLoading(nextIsLoading),
             status: undefined,
             errors: undefined,
-          } as Partial<TData[typeof storeKey]>);
+          });
         },
       })
     );

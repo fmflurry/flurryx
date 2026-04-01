@@ -5,7 +5,7 @@ vi.mock("@angular/core", async () => {
 });
 
 import { Store } from "../store-builder";
-import type { ResourceState } from "@flurryx/core";
+import { createFromToken, describeToken } from "./test-helpers";
 
 interface Product {
   id: string;
@@ -17,9 +17,9 @@ describe("Store fluent builder", () => {
     const token = Store.resource("products").as<Product[]>().build();
 
     expect(token).toBeDefined();
-    expect(token.description).toBe("FlurryxStore");
+    expect(describeToken(token)).toBe("FlurryxStore");
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
     const sig = store.get("products");
     expect(sig).toBeDefined();
     expect(sig().isLoading).toBe(false);
@@ -33,7 +33,7 @@ describe("Store fluent builder", () => {
       .as<Product>()
       .build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     expect(store.get("products")).toBeDefined();
     expect(store.get("selectedProduct")).toBeDefined();
@@ -42,7 +42,7 @@ describe("Store fluent builder", () => {
   it("should support update operations on built store", () => {
     const token = Store.resource("items").as<string[]>().build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.update("items", {
       data: ["a", "b"],
@@ -57,7 +57,7 @@ describe("Store fluent builder", () => {
   it("should support startLoading/stopLoading on built store", () => {
     const token = Store.resource("data").as<number>().build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.startLoading("data");
     expect(store.get("data")().isLoading).toBe(true);
@@ -73,7 +73,7 @@ describe("Store fluent builder", () => {
       .as<number>()
       .build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.update("a", { data: "hello" });
     store.update("b", { data: 99 });
@@ -89,7 +89,7 @@ describe("Store fluent builder", () => {
   it("should support onUpdate callbacks on built store", () => {
     const token = Store.resource("items").as<string>().build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
     const callback = vi.fn();
     const cleanup = store.onUpdate("items", callback);
 
@@ -104,8 +104,8 @@ describe("Store fluent builder", () => {
   it("should produce independent store instances per factory call", () => {
     const token = Store.resource("count").as<number>().build();
 
-    const store1 = token.options!.factory();
-    const store2 = token.options!.factory();
+    const store1 = createFromToken(token);
+    const store2 = createFromToken(token);
 
     store1.update("count", { data: 42 });
     expect(store1.get("count")().data).toBe(42);
@@ -145,9 +145,9 @@ describe("Store.for() constrained builder", () => {
       .build();
 
     expect(token).toBeDefined();
-    expect(token.description).toBe("FlurryxStore");
+    expect(describeToken(token)).toBe("FlurryxStore");
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
     expect(store.get("SESSIONS")).toBeDefined();
     expect(store.get("CURRENT_SESSION")).toBeDefined();
     expect(store.get("MESSAGES")).toBeDefined();
@@ -163,7 +163,7 @@ describe("Store.for() constrained builder", () => {
       .as<ChatMessage[]>()
       .build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
     const sessions = store.get("SESSIONS")();
 
     expect(sessions.isLoading).toBe(false);
@@ -180,7 +180,7 @@ describe("Store.for() constrained builder", () => {
       .as<ChatMessage[]>()
       .build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.update("MESSAGES", {
       data: [{ role: "user", content: "hello" }],
@@ -202,7 +202,7 @@ describe("Store.for() constrained builder", () => {
       .as<ChatMessage[]>()
       .build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.startLoading("SESSIONS");
     expect(store.get("SESSIONS")().isLoading).toBe(true);
@@ -221,7 +221,7 @@ describe("Store.for() constrained builder", () => {
       .as<ChatMessage[]>()
       .build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.update("SESSIONS", { data: [{ id: "1", title: "test" }] });
     store.update("MESSAGES", { data: [{ role: "user", content: "hi" }] });
@@ -246,7 +246,7 @@ describe("Store.for() constrained builder", () => {
       .as<ChatMessage[]>()
       .build();
 
-    const store = token.options!.factory();
+    const store = createFromToken(token);
     const callback = vi.fn();
     const cleanup = store.onUpdate("CURRENT_SESSION", callback);
 
@@ -268,8 +268,8 @@ describe("Store.for() constrained builder", () => {
       .as<ChatMessage[]>()
       .build();
 
-    const store1 = token.options!.factory();
-    const store2 = token.options!.factory();
+    const store1 = createFromToken(token);
+    const store2 = createFromToken(token);
 
     store1.update("SESSIONS", { data: [{ id: "1", title: "a" }] });
     expect(store1.get("SESSIONS")().data).toEqual([{ id: "1", title: "a" }]);
@@ -292,12 +292,12 @@ describe("Store.for<Config>().build() interface-based builder", () => {
     const token = Store.for<AppConfig>().build();
 
     expect(token).toBeDefined();
-    expect(token.description).toBe("FlurryxStore");
+    expect(describeToken(token)).toBe("FlurryxStore");
   });
 
   it("should produce a working lazy store from factory", () => {
     const token = Store.for<AppConfig>().build();
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     const sig = store.get("SESSIONS");
     expect(sig).toBeDefined();
@@ -307,7 +307,7 @@ describe("Store.for<Config>().build() interface-based builder", () => {
 
   it("should support update operations", () => {
     const token = Store.for<AppConfig>().build();
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.update("MESSAGES", {
       data: [{ role: "user", content: "hello" }],
@@ -321,7 +321,7 @@ describe("Store.for<Config>().build() interface-based builder", () => {
 
   it("should support startLoading and stopLoading", () => {
     const token = Store.for<AppConfig>().build();
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.startLoading("SESSIONS");
     expect(store.get("SESSIONS")().isLoading).toBe(true);
@@ -332,7 +332,7 @@ describe("Store.for<Config>().build() interface-based builder", () => {
 
   it("should support clear and clearAll", () => {
     const token = Store.for<AppConfig>().build();
-    const store = token.options!.factory();
+    const store = createFromToken(token);
 
     store.update("SESSIONS", { data: [{ id: "1", title: "test" }] });
     store.update("MESSAGES", { data: [{ role: "user", content: "hi" }] });
@@ -349,7 +349,7 @@ describe("Store.for<Config>().build() interface-based builder", () => {
 
   it("should support onUpdate callbacks", () => {
     const token = Store.for<AppConfig>().build();
-    const store = token.options!.factory();
+    const store = createFromToken(token);
     const callback = vi.fn();
 
     const cleanup = store.onUpdate("CURRENT_SESSION", callback);
@@ -363,8 +363,8 @@ describe("Store.for<Config>().build() interface-based builder", () => {
 
   it("should produce independent instances per factory call", () => {
     const token = Store.for<AppConfig>().build();
-    const store1 = token.options!.factory();
-    const store2 = token.options!.factory();
+    const store1 = createFromToken(token);
+    const store2 = createFromToken(token);
 
     store1.update("SESSIONS", { data: [{ id: "1", title: "a" }] });
     expect(store1.get("SESSIONS")().data).toEqual([{ id: "1", title: "a" }]);

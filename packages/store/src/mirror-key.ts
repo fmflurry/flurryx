@@ -1,5 +1,4 @@
-import type { ResourceState } from "@flurryx/core";
-import type { IStore } from "./types";
+import type { IStore, StoreDataShape, StoreKey } from "./types";
 
 export interface MirrorOptions {
   destroyRef?: { onDestroy: (fn: () => void) => void };
@@ -17,18 +16,18 @@ export interface MirrorOptions {
  * @returns Cleanup function to stop mirroring
  */
 export function mirrorKey<
-  TSource extends Record<string, ResourceState<unknown>>,
-  TTarget extends Record<string, ResourceState<unknown>>
+  TSource extends StoreDataShape<TSource>,
+  TTarget extends StoreDataShape<TTarget>
 >(
   source: IStore<TSource>,
-  sourceKey: keyof TSource & string,
+  sourceKey: StoreKey<TSource>,
   target: IStore<TTarget>,
-  targetKeyOrOptions?: (keyof TTarget & string) | MirrorOptions,
+  targetKeyOrOptions?: StoreKey<TTarget> | MirrorOptions,
   options?: MirrorOptions
 ): () => void {
   const resolvedTargetKey = (
     typeof targetKeyOrOptions === "string" ? targetKeyOrOptions : sourceKey
-  ) as keyof TTarget & string;
+  ) as StoreKey<TTarget>;
 
   const resolvedOptions =
     typeof targetKeyOrOptions === "object" ? targetKeyOrOptions : options;
@@ -36,7 +35,7 @@ export function mirrorKey<
   const cleanup = source.onUpdate(sourceKey, (state) => {
     target.update(
       resolvedTargetKey,
-      state as unknown as Partial<TTarget[keyof TTarget & string]>
+      state as unknown as Partial<TTarget[StoreKey<TTarget>]>
     );
   });
 

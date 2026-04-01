@@ -1,6 +1,7 @@
 export { BaseStore } from "./base-store";
 export { LazyStore } from "./lazy-store";
 export { Store } from "./store-builder";
+export { clearAllStores } from "./store-registry";
 export { mirrorKey } from "./mirror-key";
 export { collectKeyed } from "./collect-keyed";
 export type { MirrorOptions } from "./mirror-key";

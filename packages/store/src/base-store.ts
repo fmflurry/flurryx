@@ -7,6 +7,7 @@ import {
   type KeyedResourceKey,
 } from "@flurryx/core";
 import type { IStore } from "./types";
+import { trackStore } from "./store-registry";
 
 type UpdateHooksMap = Map<
   unknown,
@@ -33,6 +34,7 @@ export abstract class BaseStore<
   protected constructor(protected readonly storeEnum: TEnum) {
     this.initializeState();
     updateHooksMap.set(this, new Map());
+    trackStore(this);
   }
 
   get<K extends keyof TData>(key: K): Signal<TData[K]> {

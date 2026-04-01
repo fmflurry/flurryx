@@ -51,7 +51,8 @@ export const MyStore = Store.for(Enum)
 | `get(key)` | Returns the `Signal` for a slot |
 | `update(key, partial)` | Merges partial state (immutable spread) |
 | `clear(key)` | Resets a slot to its initial empty state |
-| `clearAll()` | Resets every slot |
+| `clearAll()` | Resets every slot in one store |
+| `clearAllStores()` | Resets every tracked store instance |
 | `startLoading(key)` | Sets `isLoading: true`, clears `status` and `errors` |
 | `stopLoading(key)` | Sets `isLoading: false`, clears `status` and `errors` |
 | `onUpdate(key, callback)` | Registers a listener fired after `update` or `clear`. Returns an unsubscribe function |
@@ -84,6 +85,19 @@ store.clear('LIST');
 
 // Clear every slot in the store
 store.clearAll();
+
+// Clear every tracked store instance in the app
+clearAllStores();
+```
+
+Import `clearAllStores` when you need a global cache reset, such as logout or tenant switching:
+
+```typescript
+import { clearAllStores } from "@flurryx/store";
+
+logout() {
+  clearAllStores();
+}
 ```
 
 ### Per-key clearing for keyed resources
@@ -133,7 +147,8 @@ export class InvoiceFacade {
 | Method | Scope | Use when |
 |---|---|---|
 | `clear(key)` | Entire slot | Logging out, resetting a form, full refresh |
-| `clearAll()` | Every slot | Session teardown |
+| `clearAll()` | Every slot in one store | Reset one feature store |
+| `clearAllStores()` | Every tracked store instance | Logout, tenant switch, full app cache reset |
 | `clearKeyedOne(key, resourceKey)` | Single entity in a keyed slot | Deleting or invalidating one cached item |
 
 ## Store Mirroring

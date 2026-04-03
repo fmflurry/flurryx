@@ -1,8 +1,11 @@
 import type { Signal } from "@angular/core";
 import { finalize, Observable, of, shareReplay, tap } from "rxjs";
+import {
+  isKeyedResourceData,
+  CACHE_NO_TIMEOUT,
+  DEFAULT_CACHE_TTL_MS,
+} from "@flurryx/core";
 import type { ResourceState, StoreEnum, KeyedResourceKey } from "@flurryx/core";
-import { isKeyedResourceData } from "@flurryx/core";
-import { CACHE_NO_TIMEOUT, DEFAULT_CACHE_TTL_MS } from "@flurryx/core";
 
 type StoreWithSignal<TKey extends StoreEnum> = {
   get: (key: TKey) => Signal<ResourceState<unknown>> | undefined;
@@ -228,6 +231,12 @@ function handleKeyedCache(
   return { hit: false };
 }
 
+interface NonKeyedCacheExtra {
+  readonly currentState: ResourceState<unknown>;
+  readonly argsString: string;
+  readonly storeSignal: Signal<ResourceState<unknown>>;
+}
+
 function handleNonKeyedCache(
   store: object,
   storeKey: StoreEnum,
@@ -235,11 +244,10 @@ function handleNonKeyedCache(
   timeoutMs: number,
   now: number,
   returnObservable: boolean,
-  currentState: ResourceState<unknown>,
-  argsString: string,
-  storeSignal: Signal<ResourceState<unknown>>
+  extra: NonKeyedCacheExtra
 ): CacheHitResult {
   const { nonKeyedCacheEntry, runtimeCacheKey } = context;
+  const { currentState, argsString, storeSignal } = extra;
 
   if (
     returnObservable &&
@@ -368,9 +376,7 @@ export function SkipIfCached<TTarget, TKey extends StoreEnum>(
           timeoutMs,
           now,
           returnObservable,
-          currentState,
-          argsString,
-          storeSignal
+          { currentState, argsString, storeSignal }
         );
       }
 

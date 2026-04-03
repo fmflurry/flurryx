@@ -1,5 +1,13 @@
 # flurryx
 
+## 0.8.2
+
+### Patch Changes
+
+- Updated dependencies
+  - @flurryx/store@0.8.2
+  - @flurryx/rx@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes

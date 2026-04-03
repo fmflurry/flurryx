@@ -1,5 +1,15 @@
 # @flurryx/rx
 
+## 0.8.2
+
+### Patch Changes
+
+- refactor(store): remove unnecessary type assertions in lazy-store
+  refactor(rx): extract NonKeyedCacheExtra interface in skip-if-cached
+  refactor(store): formatting cleanup in store-builder
+- Updated dependencies
+  - @flurryx/store@0.8.2
+
 ## 0.8.1
 
 ### Patch Changes

@@ -308,6 +308,42 @@ function createCachedObservable(
   );
 }
 
+/**
+ * Method decorator that skips execution when the store already has valid cached data.
+ *
+ * **Cache hit** (method skipped) when:
+ * - `status === 'Success'` or `isLoading === true`
+ * - Timeout has not expired
+ * - Method arguments match (compared via `JSON.stringify`)
+ *
+ * **Cache miss** (method executes) when:
+ * - Initial state (no status, not loading)
+ * - `status === 'Error'` (errors are never cached)
+ * - Timeout expired
+ * - Arguments changed
+ *
+ * **Keyed resources**: When the first argument is a `string | number` and the store
+ * data is a `KeyedResourceData`, cache entries are tracked per resource key automatically.
+ *
+ * @param storeKey - The store slot to check for cached data.
+ * @param storeGetter - Function to retrieve the store from the decorated class instance.
+ * @param returnObservable - When `true`, returns `Observable` (with `shareReplay` for deduplication).
+ *   When `false`, returns `void`.
+ *   @default false
+ * @param timeoutMs - Cache TTL in milliseconds. Use `CACHE_NO_TIMEOUT` for infinite.
+ *   @default DEFAULT_CACHE_TTL_MS (300 000 ms / 5 minutes)
+ *
+ * @example
+ * ```ts
+ * @SkipIfCached('LIST', (i: ProductFacade) => i.store)
+ * @Loading('LIST', (i: ProductFacade) => i.store)
+ * loadProducts() {
+ *   this.http.get('/api/products')
+ *     .pipe(syncToStore(this.store, 'LIST'))
+ *     .subscribe();
+ * }
+ * ```
+ */
 export function SkipIfCached<TKey extends StoreEnum>(
   storeKey: TKey,
   storeGetter: (instance: {
@@ -316,6 +352,7 @@ export function SkipIfCached<TKey extends StoreEnum>(
   returnObservable?: boolean,
   timeoutMs?: number
 ): MethodDecorator;
+/** @inheritDoc */
 export function SkipIfCached<TTarget, TKey extends StoreEnum>(
   storeKey: TKey,
   storeGetter: (instance: TTarget) => StoreWithSignal<TKey> | undefined,

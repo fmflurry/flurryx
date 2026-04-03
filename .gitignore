@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Environment files
+.env
+
+# Logs
+npm-debug.log*
+
+# OS files
+.DS_Store

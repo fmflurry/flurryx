@@ -1,0 +1,20 @@
+<div class="app-layout">
+  <nav class="sidebar">
+    <div class="sidebar-header">
+      <h1 class="logo">Taskflurry</h1>
+      <p class="tagline">Powered by flurryx</p>
+    </div>
+    <ul class="nav-links">
+      <li>
+        <a routerLink="/projects" routerLinkActive="active">Projects</a>
+      </li>
+      <li>
+        <a routerLink="/tasks" routerLinkActive="active">Tasks</a>
+      </li>
+    </ul>
+  </nav>
+  <main class="content">
+    <router-outlet />
+  </main>
+</div>
+<app-snackbar />

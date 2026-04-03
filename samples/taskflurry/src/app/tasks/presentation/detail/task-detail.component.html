@@ -1,0 +1,114 @@
+<div class="task-detail">
+  <div class="task-detail__nav">
+    <a routerLink="../list" class="task-detail__back">Back to task list</a>
+    @if (task(); as t) {
+      <a routerLink="/projects/list" class="task-detail__back">Back to project</a>
+    }
+  </div>
+
+  @if (isLoading()) {
+    <div class="task-detail__loading">Loading task...</div>
+  }
+
+  @if (hasError()) {
+    <div class="task-detail__error">
+      <p>Failed to load task.</p>
+      @for (error of errors(); track error.code) {
+        <p>{{ error.message }}</p>
+      }
+    </div>
+  }
+
+  @if (task(); as task) {
+    @if (editing()) {
+      <div class="task-detail__card">
+        <form [formGroup]="form" (ngSubmit)="saveChanges()" class="task-detail__form">
+          <div class="task-detail__field">
+            <label for="title" class="task-detail__label">Title</label>
+            <input id="title" formControlName="title" type="text" class="task-detail__input" />
+            @if (form.controls.title.touched && form.controls.title.errors) {
+              <span class="task-detail__field-error">Title is required (min 3 characters).</span>
+            }
+          </div>
+
+          <div class="task-detail__field">
+            <label for="description" class="task-detail__label">Description</label>
+            <textarea
+              id="description"
+              formControlName="description"
+              rows="4"
+              class="task-detail__textarea"
+            ></textarea>
+          </div>
+
+          <div class="task-detail__field-row">
+            <div class="task-detail__field">
+              <label for="priority" class="task-detail__label">Priority</label>
+              <select id="priority" formControlName="priority" class="task-detail__select">
+                @for (p of priorities; track p) {
+                  <option [value]="p">{{ p }}</option>
+                }
+              </select>
+            </div>
+
+            <div class="task-detail__field">
+              <label for="status" class="task-detail__label">Status</label>
+              <select id="status" formControlName="status" class="task-detail__select">
+                @for (s of statuses; track s) {
+                  <option [value]="s">{{ s }}</option>
+                }
+              </select>
+            </div>
+          </div>
+
+          <div class="task-detail__actions">
+            <button type="button" class="task-detail__cancel-btn" (click)="cancelEditing()">
+              Cancel
+            </button>
+            <button
+              type="submit"
+              class="task-detail__save-btn"
+              [disabled]="form.invalid"
+            >
+              Save changes
+            </button>
+          </div>
+        </form>
+      </div>
+    } @else {
+      <div class="task-detail__card">
+        <div class="task-detail__card-header">
+          <h1 class="task-detail__title">{{ task.title }}</h1>
+          <div class="task-detail__header-actions">
+            <button class="task-detail__edit-btn" (click)="startEditing(task)">Edit</button>
+            <button class="task-detail__delete-btn" (click)="deleteTask()">Delete</button>
+          </div>
+        </div>
+
+        <div class="task-detail__meta">
+          <span class="task-detail__priority" [attr.data-priority]="task.priority">
+            {{ task.priority }}
+          </span>
+          <span class="task-detail__status" [attr.data-status]="task.status">
+            {{ task.status }}
+          </span>
+        </div>
+
+        @if (task.description) {
+          <p class="task-detail__description">{{ task.description }}</p>
+        }
+
+        <div class="task-detail__info">
+          <div class="task-detail__info-item">
+            <span class="task-detail__info-label">Project</span>
+            <span class="task-detail__info-value">{{ task.projectId }}</span>
+          </div>
+          <div class="task-detail__info-item">
+            <span class="task-detail__info-label">Created</span>
+            <span class="task-detail__info-value">{{ task.createdAt }}</span>
+          </div>
+        </div>
+      </div>
+    }
+  }
+</div>

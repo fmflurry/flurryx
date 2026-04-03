@@ -1,0 +1,92 @@
+@if (isLoading()) {
+  <div class="loading-container">
+    <p>Loading projects...</p>
+  </div>
+}
+
+@if (hasError()) {
+  <div class="error-container">
+    <p class="error-title">Failed to load projects</p>
+    @for (error of errors(); track error.code) {
+      <p class="error-message">{{ error.message }}</p>
+    }
+  </div>
+}
+
+@if (!isLoading() && !hasError()) {
+  <div class="projects-header">
+    <h2>Projects</h2>
+    @if (selectedProjectId()) {
+      <button class="clear-selection-btn" (click)="clearSelection()">
+        Clear Selection
+      </button>
+    }
+  </div>
+
+  <div class="projects-grid">
+    @for (project of projects(); track project.id) {
+      <div
+        class="project-card"
+        [class.selected]="isSelected(project)"
+        (click)="selectProject(project)"
+      >
+        <div class="color-indicator" [style.background-color]="project.color"></div>
+        <div class="project-content">
+          <h3 class="project-name">{{ project.name }}</h3>
+          @if (project.description) {
+            <p class="project-description">{{ project.description }}</p>
+          }
+          @if (isLoadingTasks()) {
+            <span class="task-count task-count--loading">loading...</span>
+          } @else {
+            <span class="task-count">{{ taskCountByProject()[project.id] || 0 }} tasks</span>
+          }
+        </div>
+      </div>
+    } @empty {
+      <p class="empty-message">No projects found.</p>
+    }
+  </div>
+
+  @if (selectedProject(); as project) {
+    <section class="tasks-section">
+      <div class="tasks-header">
+        <h3>Tasks for {{ project.name }}</h3>
+        <a
+          class="create-task-btn"
+          [routerLink]="['/tasks/create']"
+          [queryParams]="{ projectId: project.id }"
+        >
+          + New Task
+        </a>
+      </div>
+
+      @if (isLoadingTasks()) {
+        <p class="tasks-loading">Loading tasks...</p>
+      } @else {
+        <div class="tasks-list">
+          @for (task of projectTasks(); track task.id) {
+            <a class="task-row" [routerLink]="['/tasks', task.id]">
+              <span class="task-status" [attr.data-status]="task.status">
+                {{ task.status }}
+              </span>
+              <span class="task-title">{{ task.title }}</span>
+              <span class="task-priority" [attr.data-priority]="task.priority">
+                {{ task.priority }}
+              </span>
+              <button
+                class="task-delete"
+                title="Delete"
+                (click)="deleteTask($event, task.id)"
+              >
+                &#x2715;
+              </button>
+            </a>
+          } @empty {
+            <p class="tasks-empty">No tasks yet for this project.</p>
+          }
+        </div>
+      }
+    </section>
+  }
+}

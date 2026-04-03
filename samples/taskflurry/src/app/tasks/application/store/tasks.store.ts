@@ -1,4 +1,5 @@
-import { Store, KeyedResourceData } from 'flurryx';
+import { Store } from 'flurryx';
+import type { KeyedResourceData } from 'flurryx';
 import { Task } from '../../domain/models/task.model';
 import { TaskProject } from '../../domain/models/task-project.model';
 
@@ -9,13 +10,11 @@ export enum TasksStoreEnum {
   PROJECTS = 'PROJECTS',
 }
 
-export const TasksStore = Store.for(TasksStoreEnum)
-  .resource('TASKS')
-  .as<Task[]>()
-  .resource('TASK_DETAIL')
-  .as<KeyedResourceData<string, Task>>()
-  .resource('TASK_CREATION')
-  .as<string>()
-  .resource('PROJECTS')
-  .as<TaskProject[]>()
-  .build();
+interface TasksStoreConfig {
+  TASKS: Task[];
+  TASK_DETAIL: KeyedResourceData<string, Task>;
+  TASK_CREATION: string;
+  PROJECTS: TaskProject[];
+}
+
+export const TasksStore = Store.for<TasksStoreConfig>().build();

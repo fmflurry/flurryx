@@ -6,9 +6,25 @@ import {
   type ErrorNormalizer,
 } from "../error/error-normalizer";
 
+/**
+ * Options for {@link syncToStore}.
+ */
 export interface SyncToStoreOptions {
+  /**
+   * Whether to complete the Observable after the first emission (applies `take(1)`).
+   * @default true
+   */
   completeOnFirstEmission?: boolean;
+  /**
+   * Callback invoked in `finalize()` after the Observable completes or errors.
+   * Useful for side effects like clearing another slot or navigating.
+   * @default undefined
+   */
   callbackAfterComplete?: () => void;
+  /**
+   * Custom function to convert error objects into the normalized `ResourceErrors` shape.
+   * @default defaultErrorNormalizer
+   */
   errorNormalizer?: ErrorNormalizer;
 }
 
@@ -19,7 +35,7 @@ interface SyncToStoreRuntimeStore {
 export function syncToStore<
   TEnum extends Record<string, string | number>,
   TData extends { [K in keyof TEnum]: ResourceState<unknown> },
-  K extends keyof TData,
+  K extends keyof TData
 >(
   store: BaseStore<TEnum, TData>,
   key: K,
@@ -28,7 +44,7 @@ export function syncToStore<
 
 export function syncToStore<
   TData extends { [K in keyof TData]: ResourceState<unknown> },
-  K extends keyof TData,
+  K extends keyof TData
 >(
   store: IStore<TData>,
   key: K,

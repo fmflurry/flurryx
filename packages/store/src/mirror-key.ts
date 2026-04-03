@@ -1,6 +1,13 @@
 import type { IStore, StoreDataShape, StoreKey } from "./types";
 
+/**
+ * Options for {@link mirrorKey}.
+ */
 export interface MirrorOptions {
+  /**
+   * Angular `DestroyRef` (or any object with an `onDestroy` method) for
+   * automatic cleanup. When provided, the mirror stops when the ref is destroyed.
+   */
   destroyRef?: { onDestroy: (fn: () => void) => void };
 }
 

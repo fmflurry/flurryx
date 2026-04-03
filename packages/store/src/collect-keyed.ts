@@ -2,12 +2,25 @@ import type {
   ResourceState,
   KeyedResourceKey,
   KeyedResourceData,
-} from '@flurryx/core';
-import { createKeyedResourceData, isAnyKeyLoading } from '@flurryx/core';
-import type { IStore, StoreDataShape, StoreKey } from './types';
+} from "@flurryx/core";
+import { createKeyedResourceData, isAnyKeyLoading } from "@flurryx/core";
+import type { IStore, StoreDataShape, StoreKey } from "./types";
 
+/**
+ * Options for {@link collectKeyed}.
+ *
+ * @template TEntity - The entity type emitted by the source store.
+ */
 export interface CollectKeyedOptions<TEntity> {
+  /**
+   * Extracts the entity identifier from the source data.
+   * Return `undefined` to skip accumulation for that emission.
+   */
   extractId: (data: TEntity | undefined) => KeyedResourceKey | undefined;
+  /**
+   * Angular `DestroyRef` (or any object with an `onDestroy` method) for
+   * automatic cleanup. When provided, collection stops when the ref is destroyed.
+   */
   destroyRef?: { onDestroy: (fn: () => void) => void };
 }
 
@@ -30,22 +43,20 @@ export interface CollectKeyedOptions<TEntity> {
 export function collectKeyed<
   TSource extends StoreDataShape<TSource>,
   TTarget extends StoreDataShape<TTarget>,
-  TEntity = unknown,
+  TEntity = unknown
 >(
   source: IStore<TSource>,
   sourceKey: StoreKey<TSource>,
   target: IStore<TTarget>,
   targetKeyOrOptions?: StoreKey<TTarget> | CollectKeyedOptions<TEntity>,
-  options?: CollectKeyedOptions<TEntity>,
+  options?: CollectKeyedOptions<TEntity>
 ): () => void {
   const resolvedTargetKey = (
-    typeof targetKeyOrOptions === 'string'
-      ? targetKeyOrOptions
-      : sourceKey
+    typeof targetKeyOrOptions === "string" ? targetKeyOrOptions : sourceKey
   ) as StoreKey<TTarget>;
 
   const resolvedOptions = (
-    typeof targetKeyOrOptions === 'object' ? targetKeyOrOptions : options
+    typeof targetKeyOrOptions === "object" ? targetKeyOrOptions : options
   ) as CollectKeyedOptions<TEntity>;
 
   // Initialize target with empty keyed resource data
@@ -60,16 +71,23 @@ export function collectKeyed<
     const currentId = resolvedOptions.extractId(resourceState.data);
     const currentTarget = target.get(resolvedTargetKey)();
     const currentKeyed = (currentTarget as ResourceState<unknown>).data as
-      KeyedResourceData<KeyedResourceKey, TEntity> | undefined;
+      | KeyedResourceData<KeyedResourceKey, TEntity>
+      | undefined;
 
     if (!currentKeyed) {
       return;
     }
 
-    if (resourceState.status === 'Success' && currentId !== undefined) {
-      const newEntities = { ...currentKeyed.entities, [currentId]: resourceState.data };
+    if (resourceState.status === "Success" && currentId !== undefined) {
+      const newEntities = {
+        ...currentKeyed.entities,
+        [currentId]: resourceState.data,
+      };
       const newIsLoading = { ...currentKeyed.isLoading, [currentId]: false };
-      const newStatus = { ...currentKeyed.status, [currentId]: resourceState.status };
+      const newStatus = {
+        ...currentKeyed.status,
+        [currentId]: resourceState.status,
+      };
       const newErrors = { ...currentKeyed.errors };
       delete newErrors[currentId];
 
@@ -83,14 +101,20 @@ export function collectKeyed<
       target.update(resolvedTargetKey, {
         data: updatedKeyed,
         isLoading: isAnyKeyLoading(newIsLoading),
-        status: 'Success',
+        status: "Success",
       } as Partial<TTarget[StoreKey<TTarget>]>);
 
       previousId = currentId;
-    } else if (resourceState.status === 'Error' && currentId !== undefined) {
+    } else if (resourceState.status === "Error" && currentId !== undefined) {
       const newIsLoading = { ...currentKeyed.isLoading, [currentId]: false };
-      const newStatus = { ...currentKeyed.status, [currentId]: resourceState.status };
-      const newErrors = { ...currentKeyed.errors, [currentId]: resourceState.errors };
+      const newStatus = {
+        ...currentKeyed.status,
+        [currentId]: resourceState.status,
+      };
+      const newErrors = {
+        ...currentKeyed.errors,
+        [currentId]: resourceState.errors,
+      };
 
       const updatedKeyed: KeyedResourceData<KeyedResourceKey, TEntity> = {
         entities: { ...currentKeyed.entities },
@@ -107,10 +131,14 @@ export function collectKeyed<
       previousId = currentId;
     } else if (resourceState.data === undefined && previousId !== undefined) {
       // Source cleared — remove previous entity from cache
-      const { [previousId]: _removed, ...remainingEntities } = currentKeyed.entities;
-      const { [previousId]: _removedLoading, ...remainingLoading } = currentKeyed.isLoading;
-      const { [previousId]: _removedStatus, ...remainingStatus } = currentKeyed.status;
-      const { [previousId]: _removedErrors, ...remainingErrors } = currentKeyed.errors;
+      const { [previousId]: _removed, ...remainingEntities } =
+        currentKeyed.entities;
+      const { [previousId]: _removedLoading, ...remainingLoading } =
+        currentKeyed.isLoading;
+      const { [previousId]: _removedStatus, ...remainingStatus } =
+        currentKeyed.status;
+      const { [previousId]: _removedErrors, ...remainingErrors } =
+        currentKeyed.errors;
 
       const updatedKeyed: KeyedResourceData<KeyedResourceKey, TEntity> = {
         entities: remainingEntities,

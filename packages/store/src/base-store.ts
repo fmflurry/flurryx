@@ -21,6 +21,18 @@ type UpdateHooksMap = Map<
 
 const updateHooksMap = new WeakMap<object, UpdateHooksMap>();
 
+/**
+ * Abstract base class for flurryx stores.
+ *
+ * Backed by Angular `signal()` per slot, providing read-only `Signal` access
+ * and immutable updates. All writes go through the store's own methods to
+ * enforce single-owner encapsulation.
+ *
+ * Use the {@link Store} builder to create instances — do not subclass directly.
+ *
+ * @template TEnum - Record mapping slot names to their string/number keys.
+ * @template TData - Record mapping slot names to `ResourceState<T>` types.
+ */
 export abstract class BaseStore<
   TEnum extends Record<string, string | number>,
   TData extends { [K in keyof TEnum]: ResourceState<unknown> }
@@ -37,10 +49,23 @@ export abstract class BaseStore<
     trackStore(this);
   }
 
+  /**
+   * Returns a **read-only** `Signal` for the given store slot.
+   *
+   * @param key - The slot name to read.
+   * @returns A `Signal` wrapping the slot's current {@link ResourceState}.
+   */
   get<K extends keyof TData>(key: K): Signal<TData[K]> {
     return this.signalsState.get(key.toString()) as unknown as Signal<TData[K]>;
   }
 
+  /**
+   * Registers a callback fired after every `update` or `clear` on the given slot.
+   *
+   * @param key - The slot to watch.
+   * @param callback - Receives the new state and the previous state.
+   * @returns A cleanup function that removes the listener when called.
+   */
   onUpdate<K extends keyof TData>(
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void
@@ -75,6 +100,12 @@ export abstract class BaseStore<
     };
   }
 
+  /**
+   * Partially updates a slot by merging `newState` into the current value (immutable spread).
+   *
+   * @param key - The slot to update.
+   * @param newState - Partial state to merge (e.g. `{ data: newData, status: 'Success' }`).
+   */
   update<K extends keyof TData>(key: K, newState: Partial<TData[K]>): void {
     const currentState = this.signalsState.get(key.toString());
     if (!currentState) {
@@ -91,12 +122,18 @@ export abstract class BaseStore<
     this.notifyUpdateHooks(key, updatedState, previousState);
   }
 
+  /** Resets every slot in this store to its initial idle state. */
   clearAll(): void {
     Object.keys(this.storeEnum).forEach((key) => {
       this.clear(key as keyof TData);
     });
   }
 
+  /**
+   * Resets a single slot to `{ data: undefined, isLoading: false, status: undefined, errors: undefined }`.
+   *
+   * @param key - The slot to clear.
+   */
   clear<K extends keyof TData>(key: K): void {
     const currentState = this.signalsState.get(key.toString());
     if (!currentState) {
@@ -116,6 +153,11 @@ export abstract class BaseStore<
     this.notifyUpdateHooks(key, nextState, previousState);
   }
 
+  /**
+   * Marks a slot as loading: sets `isLoading: true` and clears `status` and `errors`.
+   *
+   * @param key - The slot to mark as loading.
+   */
   startLoading<K extends keyof TData>(key: K): void {
     const currentState = this.signalsState.get(key.toString());
     if (!currentState) {
@@ -134,6 +176,12 @@ export abstract class BaseStore<
     );
   }
 
+  /**
+   * Marks a slot as no longer loading: sets `isLoading: false`.
+   * Does **not** clear `status` or `errors`.
+   *
+   * @param key - The slot to stop loading.
+   */
   stopLoading<K extends keyof TData>(key: K): void {
     const currentState = this.signalsState.get(key.toString());
     if (!currentState) {
@@ -150,6 +198,15 @@ export abstract class BaseStore<
     );
   }
 
+  /**
+   * Merges a single entity into a {@link KeyedResourceData} slot.
+   * Sets its status to `'Success'` and clears per-key errors.
+   * The top-level `isLoading` is recalculated based on remaining loading keys.
+   *
+   * @param key - The keyed slot name.
+   * @param resourceKey - The entity identifier (e.g. `'inv-123'`).
+   * @param entity - The entity value to store.
+   */
   updateKeyedOne<K extends keyof TData>(
     key: K,
     resourceKey: KeyedResourceKey,
@@ -193,6 +250,14 @@ export abstract class BaseStore<
     } as Partial<TData[K]>);
   }
 
+  /**
+   * Removes a single entity from a {@link KeyedResourceData} slot,
+   * including its loading flag, status, and errors.
+   * Recalculates the top-level `isLoading` from the remaining keys.
+   *
+   * @param key - The keyed slot name.
+   * @param resourceKey - The entity identifier to remove.
+   */
   clearKeyedOne<K extends keyof TData>(
     key: K,
     resourceKey: KeyedResourceKey
@@ -246,6 +311,14 @@ export abstract class BaseStore<
     this.notifyUpdateHooks(key, updatedState, previousState);
   }
 
+  /**
+   * Marks a single entity within a keyed slot as loading.
+   * Clears its status and errors. If the slot data is not yet a {@link KeyedResourceData},
+   * falls back to `startLoading(key)`.
+   *
+   * @param key - The keyed slot name.
+   * @param resourceKey - The entity identifier to mark as loading.
+   */
   startKeyedLoading<K extends keyof TData>(
     key: K,
     resourceKey: KeyedResourceKey

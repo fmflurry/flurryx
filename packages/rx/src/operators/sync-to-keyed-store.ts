@@ -20,8 +20,33 @@ interface SyncToKeyedStoreRuntimeStore {
   update(key: PropertyKey, newState: unknown): void;
 }
 
+/**
+ * Options for {@link syncToKeyedStore}.
+ *
+ * Extends {@link SyncToStoreOptions} with keyed-specific options.
+ *
+ * @template R - The raw response type from the Observable.
+ * @template TValue - The entity type stored in the keyed slot.
+ */
 export interface SyncToKeyedStoreOptions<R, TValue> extends SyncToStoreOptions {
+  /**
+   * Transform the raw API response before writing it to the store.
+   * Useful when the API envelope differs from the entity type.
+   *
+   * @default undefined (response is stored as-is)
+   *
+   * @example
+   * ```ts
+   * syncToKeyedStore(store, 'ITEMS', id, {
+   *   mapResponse: (response) => response.data,
+   * })
+   * ```
+   */
   mapResponse?: (response: R) => TValue;
+  /**
+   * Custom function to convert error objects into the normalized `ResourceErrors` shape.
+   * @default defaultErrorNormalizer
+   */
   errorNormalizer?: ErrorNormalizer;
 }
 
@@ -80,9 +105,7 @@ export function syncToKeyedStore(
     let pipeline = source.pipe(
       tap({
         next: (response: unknown) => {
-          const value = mapResponse
-            ? mapResponse(response)
-            : response;
+          const value = mapResponse ? mapResponse(response) : response;
 
           const storeSignal = syncStore.get(storeKey);
           const state = storeSignal();
@@ -97,10 +120,11 @@ export function syncToKeyedStore(
             [resourceKey]: false,
           } as Partial<Record<KeyedResourceKey, boolean>>;
 
-          const nextStatus: Partial<Record<KeyedResourceKey, ResourceStatus>> = {
-            ...data.status,
-            [resourceKey]: "Success" as ResourceStatus,
-          };
+          const nextStatus: Partial<Record<KeyedResourceKey, ResourceStatus>> =
+            {
+              ...data.status,
+              [resourceKey]: "Success" as ResourceStatus,
+            };
 
           const nextData: KeyedResourceData<KeyedResourceKey, unknown> = {
             ...data,
@@ -134,15 +158,17 @@ export function syncToKeyedStore(
             [resourceKey]: false,
           } as Partial<Record<KeyedResourceKey, boolean>>;
 
-          const nextStatus: Partial<Record<KeyedResourceKey, ResourceStatus>> = {
-            ...data.status,
-            [resourceKey]: "Error" as ResourceStatus,
-          };
+          const nextStatus: Partial<Record<KeyedResourceKey, ResourceStatus>> =
+            {
+              ...data.status,
+              [resourceKey]: "Error" as ResourceStatus,
+            };
 
-          const nextErrors: Partial<Record<KeyedResourceKey, ResourceErrors>> = {
-            ...data.errors,
-            [resourceKey]: normalizeError(error),
-          };
+          const nextErrors: Partial<Record<KeyedResourceKey, ResourceErrors>> =
+            {
+              ...data.errors,
+              [resourceKey]: normalizeError(error),
+            };
 
           const nextData: KeyedResourceData<KeyedResourceKey, unknown> = {
             ...data,

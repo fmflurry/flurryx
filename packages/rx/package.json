@@ -1,6 +1,6 @@
 {
   "name": "@flurryx/rx",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "RxJS operators and decorators for flurryx stores",
   "license": "MIT",
   "type": "module",
@@ -38,8 +38,8 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@flurryx/core": "0.8.0",
-    "@flurryx/store": "0.8.3"
+    "@flurryx/core": "0.8.4",
+    "@flurryx/store": "0.8.4"
   },
   "peerDependencies": {
     "@angular/core": ">=17.0.0",

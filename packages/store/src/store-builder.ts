@@ -115,19 +115,45 @@ interface AsStep<TAccum extends StoreConfig, TKey extends string> {
 
 /**
  * Fluent builder for creating stores.
- * Accumulates resource definitions then produces an InjectionToken on .build().
+ * Accumulates resource definitions then produces an `InjectionToken` on `.build()`.
  */
 interface StoreBuilder<TAccum extends StoreConfig> {
+  /** Define a new resource slot. Chain `.as<T>()` to set its type. */
   resource<TKey extends string>(key: TKey): AsStep<TAccum, TKey>;
+
+  /**
+   * Mirror a slot from another store. When the source updates, the target is kept in sync.
+   *
+   * @param source - The source store's `InjectionToken`.
+   * @param sourceKey - The key to watch on the source store.
+   * @param targetKey - The key on this store to write to. Defaults to `sourceKey`.
+   */
   mirror<TSourceData extends StoreDataShape<TSourceData>>(
     source: InjectionToken<IStore<TSourceData>>,
     sourceKey: StoreKey<TSourceData>,
     targetKey?: StoreKey<TAccum>
   ): StoreBuilder<TAccum>;
+
+  /**
+   * Mirror one slot to another **within the same store**.
+   * Source and target keys must be different.
+   *
+   * @param sourceKey - The slot to read from.
+   * @param targetKey - The slot to write to.
+   */
   mirrorSelf(
     sourceKey: StoreKey<TAccum>,
     targetKey: StoreKey<TAccum>
   ): StoreBuilder<TAccum>;
+
+  /**
+   * Accumulate single-entity fetches from a source store into a `KeyedResourceData` slot.
+   *
+   * @param source - The source store's `InjectionToken`.
+   * @param sourceKey - The single-entity key on the source store.
+   * @param options - Must include `extractId` to derive the entity's key from its data.
+   * @param targetKey - The keyed slot on this store. Defaults to `sourceKey`.
+   */
   mirrorKeyed<TSourceData extends StoreDataShape<TSourceData>, TEntity>(
     source: InjectionToken<IStore<TSourceData>>,
     sourceKey: StoreKey<TSourceData>,
@@ -136,6 +162,11 @@ interface StoreBuilder<TAccum extends StoreConfig> {
     },
     targetKey?: StoreKey<TAccum>
   ): StoreBuilder<TAccum>;
+
+  /**
+   * Finalize the builder and create an `InjectionToken` (`providedIn: 'root'`).
+   * All mirrors are wired up automatically when Angular creates the store.
+   */
   build(): InjectionToken<BaseStore<InferEnum<TAccum>, InferData<TAccum>>>;
 }
 

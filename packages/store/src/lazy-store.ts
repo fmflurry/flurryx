@@ -98,8 +98,6 @@ export class LazyStore<TData extends StoreDataShape<TData>>
         ({
           ...state,
           isLoading: false,
-          status: undefined,
-          errors: undefined,
         } as TData[K])
     );
   }

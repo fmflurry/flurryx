@@ -1,5 +1,11 @@
 # @flurryx/store
 
+## 0.8.3
+
+### Patch Changes
+
+- fix(store): stopLoading no longer clears errors and status
+
 ## 0.8.2
 
 ### Patch Changes

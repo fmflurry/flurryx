@@ -1,0 +1,48 @@
+<div class="tasks-list">
+  <div class="tasks-list__header">
+    <h1>Tasks</h1>
+    <a routerLink="../create" class="tasks-list__create-btn">Create Task</a>
+  </div>
+
+  @if (isLoading()) {
+    <div class="tasks-list__loading">Loading tasks...</div>
+  }
+
+  @if (hasError()) {
+    <div class="tasks-list__error">
+      <p>Failed to load tasks.</p>
+      @for (error of errors(); track error.code) {
+        <p>{{ error.message }}</p>
+      }
+    </div>
+  }
+
+  @if (!isLoading() && !hasError()) {
+    @if (tasks().length === 0) {
+      <div class="tasks-list__empty">No tasks found. Create one to get started.</div>
+    } @else {
+      <ul class="tasks-list__items">
+        @for (task of tasks(); track task.id) {
+          <li class="tasks-list__item">
+            <a [routerLink]="['../', task.id]" class="tasks-list__item-link">
+              <span class="tasks-list__item-title">{{ task.title }}</span>
+              <span class="tasks-list__item-priority" [attr.data-priority]="task.priority">
+                {{ task.priority }}
+              </span>
+              <span class="tasks-list__item-status" [attr.data-status]="task.status">
+                {{ task.status }}
+              </span>
+              <button
+                class="tasks-list__item-delete"
+                title="Delete"
+                (click)="deleteTask($event, task.id)"
+              >
+                &#x2715;
+              </button>
+            </a>
+          </li>
+        }
+      </ul>
+    }
+  }
+</div>

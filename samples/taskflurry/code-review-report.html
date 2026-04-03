@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Code Review Report — TaskFlurry</title>
+  <style>
+    :root {
+      --critical: #dc2626;
+      --high: #ea580c;
+      --medium: #d97706;
+      --low: #6b7280;
+      --pass: #16a34a;
+      --bg: #f8fafc;
+      --card: #fff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --code-bg: #f1f5f9;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 2rem;
+    }
+
+    header h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .summary-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      text-align: center;
+      border-top: 3px solid var(--border);
+    }
+
+    .summary-card--critical { border-top-color: var(--critical); }
+    .summary-card--high { border-top-color: var(--high); }
+    .summary-card--medium { border-top-color: var(--medium); }
+    .summary-card--low { border-top-color: var(--low); }
+    .summary-card--total { border-top-color: var(--text); }
+
+    .summary-card .count {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .summary-card .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .summary-card--critical .count { color: var(--critical); }
+    .summary-card--high .count { color: var(--high); }
+    .summary-card--medium .count { color: var(--medium); }
+    .summary-card--low .count { color: var(--low); }
+
+    .verdict {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1rem 1.25rem;
+      margin-bottom: 2.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .verdict--warn { border-left: 4px solid var(--high); }
+
+    .verdict .icon {
+      font-size: 1.5rem;
+      flex-shrink: 0;
+    }
+
+    .verdict .text {
+      font-size: 0.875rem;
+    }
+
+    .verdict .text strong {
+      font-size: 1rem;
+    }
+
+    .section {
+      margin-bottom: 2.5rem;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .section-header h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.125rem 0.5rem;
+      border-radius: 9999px;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #fff;
+    }
+
+    .badge--critical { background: var(--critical); }
+    .badge--high { background: var(--high); }
+    .badge--medium { background: var(--medium); }
+    .badge--low { background: var(--low); }
+    .badge--pass { background: var(--pass); }
+
+    .issue {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+
+    .issue summary {
+      padding: 0.875rem 1.25rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 500;
+      user-select: none;
+      list-style: none;
+    }
+
+    .issue summary::-webkit-details-marker { display: none; }
+
+    .issue summary::before {
+      content: '\25B6';
+      font-size: 0.625rem;
+      color: var(--text-muted);
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+
+    .issue[open] summary::before {
+      transform: rotate(90deg);
+    }
+
+    .issue summary:hover {
+      background: var(--bg);
+    }
+
+    .issue .id {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      min-width: 2.5rem;
+    }
+
+    .issue .title {
+      flex: 1;
+      font-size: 0.9375rem;
+    }
+
+    .issue .location-badge {
+      font-family: var(--font-mono);
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      background: var(--code-bg);
+      padding: 0.125rem 0.5rem;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .issue-body {
+      padding: 0 1.25rem 1.25rem 3rem;
+      font-size: 0.875rem;
+    }
+
+    .issue-body p {
+      margin-bottom: 0.75rem;
+    }
+
+    .issue-body .location {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .issue-body .location span {
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    .issue-body pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 0.375rem;
+      padding: 0.75rem 1rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      margin-bottom: 0.75rem;
+    }
+
+    .issue-body .suggestion {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 0.375rem;
+      padding: 0.625rem 0.875rem;
+      font-size: 0.8125rem;
+      color: #166534;
+    }
+
+    .issue-body .suggestion strong {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 0 1rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 640px) {
+      body { padding: 1rem; }
+      .summary-grid { grid-template-columns: repeat(3, 1fr); }
+      .issue .location-badge { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <h1>Code Review Report</h1>
+      <p>TaskFlurry Sample App &mdash; <code>samples/taskflurry/src/app/</code> &mdash; 2026-04-03</p>
+    </header>
+
+    <!-- Summary -->
+    <div class="summary-grid">
+      <div class="summary-card summary-card--critical">
+        <div class="count">0</div>
+        <div class="label">Critical</div>
+      </div>
+      <div class="summary-card summary-card--high">
+        <div class="count">0</div>
+        <div class="label">High</div>
+      </div>
+      <div class="summary-card summary-card--medium">
+        <div class="count">7</div>
+        <div class="label">Medium</div>
+      </div>
+      <div class="summary-card summary-card--low">
+        <div class="count">5</div>
+        <div class="label">Low</div>
+      </div>
+      <div class="summary-card summary-card--total">
+        <div class="count">12</div>
+        <div class="label">Total</div>
+      </div>
+    </div>
+
+    <!-- Verdict -->
+    <div class="verdict" style="border-left: 4px solid var(--pass);">
+      <div class="icon">&#10003;</div>
+      <div class="text">
+        <strong>ALL HIGH ISSUES RESOLVED</strong> &mdash; All 5 HIGH issues have been fixed.
+        7 MEDIUM and 5 LOW issues remain for follow-up.
+      </div>
+    </div>
+
+    <!-- HIGH Issues -->
+    <div class="section">
+      <div class="section-header">
+        <h2>High</h2>
+        <span class="badge badge--pass">5 resolved</span>
+      </div>
+
+      <details class="issue">
+        <summary>
+          <span class="id">H1</span>
+          <span class="badge badge--pass">RESOLVED</span>
+          <span class="title">Cross-domain Use Case imports in facades</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            <strong>Fixed:</strong> Each facade now only imports its own domain's use cases.
+            Cross-domain functionality is accessed through domain-local use cases that inject
+            abstract ports from the sibling domain. The context registry binds those ports to
+            concrete adapters via <code>contextProvidersFor()</code>.
+          </p>
+<pre>// projects/application/use-cases/get-project-tasks.use-case.ts
+export class GetProjectTasksUseCase {
+  private readonly getTasksPort = inject(GetTasksPort);
+  execute() { return this.getTasksPort.execute(); }
+}
+
+// projects/application/facades/projects.facade.ts
+// Now only imports from own domain:
+import { GetProjectTasksUseCase } from '../use-cases/get-project-tasks.use-case';
+import { DeleteProjectTaskUseCase } from '../use-cases/delete-project-task.use-case';</pre>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">H2</span>
+          <span class="badge badge--pass">RESOLVED</span>
+          <span class="title">Domain store holds sibling domain types</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            <strong>Fixed:</strong> Each store now uses domain-local read models instead of importing
+            types from sibling domains. Cross-domain use cases map external types to local projections.
+          </p>
+<pre>// projects/domain/models/project-task.model.ts (local read model)
+export type ProjectTask = {
+  readonly id: string;
+  readonly title: string;
+  readonly priority: ProjectTaskPriority;
+  readonly status: ProjectTaskStatus;
+  readonly projectId: string;
+};
+
+// projects/application/store/projects.store.ts
+import { ProjectTask } from '../../domain/models/project-task.model';
+// ...
+.resource('TASKS').as&lt;ProjectTask[]&gt;()  // own domain type
+
+// tasks/domain/models/task-project.model.ts (local read model)
+export type TaskProject = {
+  readonly id: string;
+  readonly name: string;
+};
+
+// Use cases map at the boundary:
+// GetProjectTasksUseCase maps Task[] &rarr; ProjectTask[]
+// GetTaskProjectsUseCase maps Project[] &rarr; TaskProject[]</pre>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">H3</span>
+          <span class="badge badge--pass">RESOLVED</span>
+          <span class="title">Missing error handler on <code>deleteTask</code> subscriptions</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            <strong>Fixed:</strong> Added a <code>SnackbarService</code> (<code>providedIn: 'root'</code>)
+            with signal-based state and auto-dismiss after 5 seconds. Both facades now handle
+            success and error in <code>deleteTask</code>, surfacing feedback via snackbar.
+          </p>
+<pre>// Both facades now:
+deleteTask(taskId: string): void {
+  this.deleteTaskUseCase.execute(taskId).subscribe({
+    next: () =&gt; {
+      this.store.clear('TASKS');
+      this.loadTasks();
+      this.snackbar.show('Task deleted successfully', 'success');
+    },
+    error: () =&gt; {
+      this.snackbar.show('Failed to delete task. Please try again.', 'error');
+    },
+  });
+}</pre>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">H4</span>
+          <span class="badge badge--pass">RESOLVED</span>
+          <span class="title">Duplicate provider registration via context + direct imports</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            <strong>Fixed:</strong> Context providers now use granular provider functions
+            (<code>getTasksProviders()</code>, <code>deleteTaskProviders()</code>,
+            <code>getProjectsProviders()</code>) exported from each domain's <code>public-api.ts</code>.
+            Service providers register only their own domain's use cases and pull cross-domain
+            dependencies solely through <code>contextProvidersFor()</code>. No duplicate registrations.
+          </p>
+<pre>// tasks-context.providers.ts
+export const TASKS_CONTEXT_PROVIDERS: Provider[] = [
+  ...getTasksProviders(),
+  ...deleteTaskProviders(),
+];
+
+// projects-service.providers.ts
+export function projectsServicesProviders(): Provider[] {
+  return [
+    ProjectsFacade,
+    GetProjectsUseCase,
+    GetProjectTasksUseCase,      // own use case, injects GetTasksPort
+    DeleteProjectTaskUseCase,     // own use case, injects DeleteTaskPort
+    ...projectsInfrastructureProviders(),
+    ...contextProvidersFor([AppContext.TASKS]),  // ports bound here
+  ];
+}</pre>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">H5</span>
+          <span class="badge badge--pass">RESOLVED</span>
+          <span class="title">Unguarded empty <code>taskId</code> reaches HTTP layer</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            <strong>Fixed:</strong> Added a guard clause in <code>ngOnInit</code> that redirects
+            to the task list when <code>taskId</code> is empty, preventing invalid API calls.
+          </p>
+<pre>ngOnInit(): void {
+  if (!this.taskId) {
+    this.router.navigate(['/tasks/list']);
+    return;
+  }
+  this.facade.loadTaskDetail(this.taskId);
+}</pre>
+        </div>
+      </details>
+    </div>
+
+    <!-- MEDIUM Issues -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Medium</h2>
+        <span class="badge badge--medium">7 issues</span>
+      </div>
+
+      <details class="issue">
+        <summary>
+          <span class="id">M1</span>
+          <span class="title">Mock interceptor mutates shared array in-place</span>
+          <span class="location-badge">mock-api.interceptor.ts</span>
+        </summary>
+        <div class="issue-body">
+          <div class="location">
+            <span>core/mock/mock-api.interceptor.ts &mdash; lines 170, 182, 198</span>
+          </div>
+          <p>
+            Three operations directly mutate the module-level <code>mockTasks</code> array using
+            <code>push</code>, <code>splice</code>, and index assignment. This contradicts the
+            project's immutability rule and teaches incorrect patterns in a sample app.
+          </p>
+<pre>mockTasks[index] = updated;   // index assignment mutates
+mockTasks.splice(index, 1);   // splice mutates in-place
+mockTasks.push(newTask);      // push mutates in-place</pre>
+          <div class="suggestion">
+            <strong>Suggested fix:</strong>
+            Reassign the array reference using <code>filter</code>, <code>map</code>, and spread
+            instead of mutating in-place. Declare with <code>let</code> to allow reassignment.
+          </div>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">M2</span>
+          <span class="title"><code>deleteTask</code> navigates before async completes</span>
+          <span class="location-badge">task-detail.component.ts:113</span>
+        </summary>
+        <div class="issue-body">
+          <div class="location">
+            <span>tasks/presentation/detail/task-detail.component.ts &mdash; lines 113&ndash;116</span>
+          </div>
+          <p>
+            Navigation to <code>/tasks/list</code> fires synchronously after calling <code>facade.deleteTask()</code>,
+            which is asynchronous. If the delete fails, the user is already on the list page
+            with no error feedback.
+          </p>
+<pre>protected deleteTask(): void {
+  this.facade.deleteTask(this.taskId);     // async, fire-and-forget
+  this.router.navigate(['/tasks/list']);    // navigates immediately
+}</pre>
+          <div class="suggestion">
+            <strong>Suggested fix:</strong>
+            Move navigation into the facade's success callback, or expose a result observable
+            that the component can subscribe to before navigating.
+          </div>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">M3</span>
+          <span class="title">Two sources of truth for task count</span>
+          <span class="location-badge">projects-list.component.ts:31</span>
+        </summary>
+        <div class="issue-body">
+          <div class="location">
+            <span>projects/presentation/list/projects-list.component.ts &mdash; lines 31&ndash;37</span>
+          </div>
+          <p>
+            The <code>Project</code> domain model includes a <code>taskCount</code> field from the API.
+            The component derives a separate live count by iterating all tasks in the store.
+            These diverge after create/delete operations.
+          </p>
+          <div class="suggestion">
+            <strong>Suggested fix:</strong>
+            Remove <code>taskCount</code> from the <code>Project</code> model (or treat it as a hint only).
+            The computed signal is the correct single source of truth.
+          </div>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">M4</span>
+          <span class="title">Bare <code>subscribe()</code> without teardown in facades</span>
+          <span class="location-badge">multiple facades</span>
+        </summary>
+        <div class="issue-body">
+          <div class="location">
+            <span>projects/application/facades/projects.facade.ts &mdash; lines 31, 37</span>
+            <span>tasks/application/facades/tasks.facade.ts &mdash; lines 44, 53, 65, 78, 90</span>
+          </div>
+          <p>
+            All fire-and-forget <code>subscribe()</code> calls are unmanaged. If an HTTP request
+            is in-flight when the route scope is destroyed, there is no cancellation.
+          </p>
+          <div class="suggestion">
+            <strong>Suggested fix:</strong>
+            Use <code>takeUntilDestroyed()</code> with a <code>DestroyRef</code> to cancel
+            in-flight requests when the provider scope is torn down.
+          </div>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">M5</span>
+          <span class="title">Presentation layer imports directly from domain layer</span>
+          <span class="location-badge">multiple components</span>
+        </summary>
+        <div class="issue-body">
+          <div class="location">
+            <span>projects/presentation/list/projects-list.component.ts &mdash; line 5</span>
+            <span>tasks/presentation/create/task-create.component.ts &mdash; line 12</span>
+            <span>tasks/presentation/detail/task-detail.component.ts &mdash; line 12</span>
+          </div>
+          <p>
+            Components import types from <code>../../domain/models/</code> instead of through
+            <code>public-api.ts</code>. This couples presentation to internal domain paths.
+          </p>
+<pre>// BAD &mdash; direct domain import
+import { Project } from '../../domain/models/project.model';
+
+// GOOD &mdash; through barrel
+import { Project } from '../../public-api';</pre>
+          <div class="suggestion">
+            <strong>Suggested fix:</strong>
+            Redirect all presentation-layer type imports through <code>public-api.ts</code>.
+          </div>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">M6</span>
+          <span class="title">"Back to project" link always shown regardless of context</span>
+          <span class="location-badge">task-detail.component.html:4</span>
+        </summary>
+        <div class="issue-body">
+          <div class="location">
+            <span>tasks/presentation/detail/task-detail.component.html &mdash; lines 4&ndash;6</span>
+          </div>
+          <p>
+            The link appears whenever task data exists, not only when the user navigated from
+            a project. The <code>@if (task(); as t)</code> declares <code>t</code> but never uses it.
+            The link always points to <code>/projects/list</code> without referencing the specific project.
+          </p>
+          <div class="suggestion">
+            <strong>Suggested fix:</strong>
+            Only show the link when the user came from a project context (e.g. via a query param
+            or navigation state). Remove the unused <code>as t</code> binding.
+          </div>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">M7</span>
+          <span class="title">Unused <code>effect</code> import</span>
+          <span class="location-badge">task-create.component.ts:5</span>
+        </summary>
+        <div class="issue-body">
+          <div class="location">
+            <span>tasks/presentation/create/task-create.component.ts &mdash; line 5</span>
+          </div>
+          <p>
+            <code>effect</code> is imported from <code>@angular/core</code> but never used after
+            the auto-navigation logic was removed.
+          </p>
+          <div class="suggestion">
+            <strong>Suggested fix:</strong>
+            Remove the unused import.
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <!-- LOW Issues -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Low</h2>
+        <span class="badge badge--low">5 issues</span>
+      </div>
+
+      <details class="issue">
+        <summary>
+          <span class="id">L1</span>
+          <span class="title">Projects store uses magic string keys instead of enum</span>
+          <span class="location-badge">projects.store.ts</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            The tasks domain uses <code>TasksStoreEnum</code> for typed store keys. The projects domain
+            uses raw string literals (<code>'PROJECTS'</code>, <code>'SELECTED_PROJECT'</code>, <code>'TASKS'</code>)
+            throughout, risking typo-induced runtime bugs.
+          </p>
+          <div class="suggestion">
+            <strong>Suggested fix:</strong>
+            Adopt the same enum pattern as the tasks domain.
+          </div>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">L2</span>
+          <span class="title">Inconsistent <code>const</code> / <code>let</code> for mock data arrays</span>
+          <span class="location-badge">mock-api.interceptor.ts:22,46</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            <code>MOCK_PROJECTS</code> uses <code>const</code> + <code>readonly</code>, signalling immutability.
+            <code>mockTasks</code> uses bare <code>let</code>, inviting accidental reference replacement.
+          </p>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">L3</span>
+          <span class="title"><code>withComponentInputBinding()</code> candidate</span>
+          <span class="location-badge">task-detail.component.ts:25,28</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            The <code>:id</code> route param is accessed via <code>ActivatedRoute</code> snapshot.
+            If <code>withComponentInputBinding()</code> is added to <code>provideRouter</code>,
+            the param can be received as an <code>input()</code>, eliminating the <code>ActivatedRoute</code>
+            dependency and improving testability.
+          </p>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">L4</span>
+          <span class="title"><code>taskCount</code> field on Project model is dead data</span>
+          <span class="location-badge">project.model.ts</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            The <code>taskCount</code> field on the <code>Project</code> type is returned by the mock API
+            but is no longer used &mdash; the UI derives live counts from the tasks store instead.
+            This is dead data that could mislead developers.
+          </p>
+        </div>
+      </details>
+
+      <details class="issue">
+        <summary>
+          <span class="id">L5</span>
+          <span class="title">Root template safety check</span>
+          <span class="location-badge">app.html</span>
+        </summary>
+        <div class="issue-body">
+          <p>
+            Confirm the root <code>app.html</code> never uses <code>[innerHTML]</code> or binds
+            to user-controlled data without Angular's default interpolation escaping.
+          </p>
+        </div>
+      </details>
+    </div>
+
+    <footer>
+      Generated by code-reviewer agent &mdash; TaskFlurry / flurryx &mdash; 2026-04-03
+    </footer>
+
+  </div>
+</body>
+</html>

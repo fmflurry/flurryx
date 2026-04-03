@@ -1,0 +1,96 @@
+<div class="task-create">
+  <a routerLink="../list" class="task-create__back">Back to list</a>
+
+  <h1 class="task-create__title">Create Task</h1>
+
+  @if (isCreated()) {
+    <div class="task-create__success">
+      <p class="task-create__success-title">Task created successfully!</p>
+      <div class="task-create__success-links">
+        <a [routerLink]="['/tasks', createdTaskId()]" class="task-create__link">
+          View task
+        </a>
+        <a routerLink="/tasks/list" class="task-create__link">
+          Back to task list
+        </a>
+        @if (cameFromProject()) {
+          <a routerLink="/projects/list" class="task-create__link task-create__link--primary">
+            Back to project
+          </a>
+        }
+      </div>
+    </div>
+  } @else {
+    @if (hasError()) {
+      <div class="task-create__error">
+        <p>Failed to create task.</p>
+        @for (error of errors(); track error.code) {
+          <p>{{ error.message }}</p>
+        }
+      </div>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="task-create__form">
+      <div class="task-create__field">
+        <label for="title" class="task-create__label">Title</label>
+        <input id="title" formControlName="title" type="text" class="task-create__input" />
+        @if (form.controls.title.touched && form.controls.title.errors) {
+          <span class="task-create__field-error">Title is required (min 3 characters).</span>
+        }
+      </div>
+
+      <div class="task-create__field">
+        <label for="description" class="task-create__label">Description</label>
+        <textarea
+          id="description"
+          formControlName="description"
+          rows="4"
+          class="task-create__textarea"
+        ></textarea>
+      </div>
+
+      <div class="task-create__field">
+        <label for="priority" class="task-create__label">Priority</label>
+        <select id="priority" formControlName="priority" class="task-create__select">
+          @for (priority of priorities; track priority) {
+            <option [value]="priority">{{ priority }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="task-create__field">
+        <label for="projectId" class="task-create__label">Project</label>
+        <select id="projectId" formControlName="projectId" class="task-create__select">
+          <option value="" disabled>
+            @if (isLoadingProjects()) {
+              Loading projects...
+            } @else {
+              Select a project
+            }
+          </option>
+          @for (project of projects(); track project.id) {
+            <option [value]="project.id">{{ project.name }}</option>
+          }
+        </select>
+        @if (form.controls.projectId.touched && form.controls.projectId.errors) {
+          <span class="task-create__field-error">Please select a project.</span>
+        }
+      </div>
+
+      <div class="task-create__actions">
+        <a routerLink="../list" class="task-create__cancel-btn">Cancel</a>
+        <button
+          type="submit"
+          class="task-create__submit-btn"
+          [disabled]="form.invalid || isSubmitting()"
+        >
+          @if (isSubmitting()) {
+            Creating...
+          } @else {
+            Create Task
+          }
+        </button>
+      </div>
+    </form>
+  }
+</div>

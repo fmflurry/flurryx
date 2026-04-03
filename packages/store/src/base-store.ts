@@ -146,8 +146,6 @@ export abstract class BaseStore<
         ({
           ...state,
           isLoading: false,
-          status: undefined,
-          errors: undefined,
         } as TData[typeof _typedKey])
     );
   }

@@ -18,6 +18,8 @@
 
 **Signal-first reactive state management for Angular.**
 
+> **See it in action** — [**Taskflurry**](https://fmflurry.github.io/flurryx/) is a live demo app built with Angular 21 (zoneless, no zone.js dependency) and flurryx. It showcases store definitions, the facade pattern with `@SkipIfCached` and `@Loading`, keyed resources with per-entity loading and errors, and Clean Architecture layering. Try the [live demo](https://fmflurry.github.io/flurryx/) or browse the [source code](samples/taskflurry).
+
 flurryx bridges the gap between RxJS async operations and Angular signals. Define a store, pipe your HTTP calls through an operator, read signals in your templates. No actions, no reducers, no effects boilerplate.
 
 ```typescript
@@ -68,8 +70,6 @@ export class ProductListComponent implements OnInit {
 ```
 
 No `async` pipe. No `subscribe` in templates. No manual unsubscription.
-
-> **See it in action** — [**Taskflurry**](https://fmflurry.github.io/flurryx/) is a live demo app built with Angular 21 (zoneless, no zone.js dependency) and flurryx. It showcases store definitions, the facade pattern with `@SkipIfCached` and `@Loading`, keyed resources with per-entity loading and errors, and Clean Architecture layering. Try the [live demo](https://fmflurry.github.io/flurryx/) or browse the [source code](samples/taskflurry).
 
 ---
 

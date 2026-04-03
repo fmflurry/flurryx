@@ -145,7 +145,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     }
 
     const data = state.data;
-    const previousState = state as TData[K];
+    const previousState = state;
 
     const nextEntities = { ...data.entities };
     delete nextEntities[resourceKey];
@@ -178,7 +178,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
         } as TData[K])
     );
 
-    const updatedState = sig() as TData[K];
+    const updatedState = sig();
     this.notifyHooks(key, updatedState, previousState);
   }
 
@@ -193,7 +193,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
       return;
     }
 
-    const previousState = state as TData[K];
+    const previousState = state;
     const data = state.data;
 
     const nextIsLoading = {
@@ -225,7 +225,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
         } as TData[K])
     );
 
-    const updatedState = sig() as TData[K];
+    const updatedState = sig();
     this.notifyHooks(key, updatedState, previousState);
   }
 

@@ -17,5 +17,5 @@ export function createFromToken<T>(token: InjectionToken<T>): T {
 }
 
 export function injectFromMock<T>(token: InjectionToken<T>): T {
-  return mockInject(token as never) as T;
+  return mockInject(token as never);
 }

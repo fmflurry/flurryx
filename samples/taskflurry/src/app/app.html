@@ -1,5 +1,16 @@
 <div class="app-layout">
-  <nav class="sidebar">
+  <header class="topbar">
+    <button class="topbar__toggle" (click)="toggleMenu()" aria-label="Toggle menu">
+      <span class="topbar__hamburger"></span>
+    </button>
+    <span class="topbar__title">Taskflurry</span>
+  </header>
+
+  @if (menuOpen()) {
+    <div class="overlay" (click)="toggleMenu()"></div>
+  }
+
+  <nav class="sidebar" [class.sidebar--open]="menuOpen()">
     <div class="sidebar-header">
       <h1 class="logo">Taskflurry</h1>
       <p class="tagline">Powered by flurryx</p>

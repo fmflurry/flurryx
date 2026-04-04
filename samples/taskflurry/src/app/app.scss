@@ -1,13 +1,87 @@
+$breakpoint-md: 768px;
+
 :host {
   display: block;
   height: 100vh;
 }
 
-.app-layout {
+// Mobile top bar
+.topbar {
   display: flex;
-  height: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  background: #1e1b4b;
+  color: #fff;
+  padding: 0.75rem 1rem;
+
+  @media (min-width: $breakpoint-md) {
+    display: none;
+  }
 }
 
+.topbar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.topbar__hamburger {
+  display: block;
+  width: 1.25rem;
+  height: 2px;
+  background: #fff;
+  position: relative;
+
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: #fff;
+  }
+
+  &::before { top: -6px; }
+  &::after { top: 6px; }
+}
+
+.topbar__title {
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+// Overlay for mobile menu
+.overlay {
+  display: none;
+
+  @media (max-width: $breakpoint-md - 1) {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 90;
+  }
+}
+
+// Layout
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+
+  @media (min-width: $breakpoint-md) {
+    flex-direction: row;
+  }
+}
+
+// Sidebar
 .sidebar {
   width: 240px;
   background: #1e1b4b;
@@ -17,6 +91,21 @@
   flex-direction: column;
   gap: 32px;
   flex-shrink: 0;
+
+  // Mobile: off-canvas drawer
+  @media (max-width: $breakpoint-md - 1) {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+
+    &--open {
+      transform: translateX(0);
+    }
+  }
 }
 
 .sidebar-header {
@@ -26,6 +115,7 @@
     margin: 0;
     color: #fff;
   }
+
   .tagline {
     font-size: 0.75rem;
     color: #a5b4fc;
@@ -62,9 +152,14 @@
   }
 }
 
+// Main content
 .content {
   flex: 1;
   background: #f8fafc;
-  padding: 32px;
+  padding: 1rem;
   overflow-y: auto;
+
+  @media (min-width: $breakpoint-md) {
+    padding: 2rem;
+  }
 }

@@ -22,8 +22,38 @@ export {
   clearAllStores,
   mirrorKey,
   collectKeyed,
+  createInMemoryStoreMessageChannel,
+  createStorageStoreMessageChannel,
+  createLocalStorageStoreMessageChannel,
+  createSessionStorageStoreMessageChannel,
+  createCompositeStoreMessageChannel,
 } from "@flurryx/store";
-export type { MirrorOptions, CollectKeyedOptions } from "@flurryx/store";
+export type {
+  MirrorOptions,
+  CollectKeyedOptions,
+  StoreOptions,
+  StoreDeadLetterEntry,
+  StoreHistory,
+  StoreHistoryEntry,
+  StoreMessageStatus,
+  StoreMessageRecord,
+  StoreMessageChannel,
+  StoreMessageChannelStorage,
+  StoreMessageChannelOptions,
+  CompositeStoreMessageChannelOptions,
+  StorageStoreMessageChannelOptions,
+  BrowserStorageStoreMessageChannelOptions,
+  StoreSnapshot,
+  StoreMessage,
+  UpdateStoreMessage,
+  ClearStoreMessage,
+  ClearAllStoreMessage,
+  StartLoadingStoreMessage,
+  StopLoadingStoreMessage,
+  UpdateKeyedOneStoreMessage,
+  ClearKeyedOneStoreMessage,
+  StartKeyedLoadingStoreMessage,
+} from "@flurryx/store";
 
 // @flurryx/rx
 export {

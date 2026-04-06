@@ -11,3 +11,6 @@ npm-debug.log*
 
 # OS files
 .DS_Store
+
+# Reports
+code-review-report.html

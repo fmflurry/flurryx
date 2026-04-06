@@ -11,18 +11,71 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/npm/v/flurryx?color=dd0031" alt="flurryx version" />
-  <img src="https://img.shields.io/badge/Angular-%3E%3D17-dd0031" alt="Angular >=17" />
-  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" />
+  <a href="https://www.npmjs.com/package/flurryx">
+    <img src="https://img.shields.io/npm/v/flurryx?color=dd0031" alt="flurryx version" />
+  </a>
+  <a href="https://github.com/fmflurry/flurryx/actions/workflows/ci.yml">
+    <img src="https://github.com/fmflurry/flurryx/actions/workflows/ci.yml/badge.svg?branch=master" alt="Build status" />
+  </a>
+  <a href="https://github.com/fmflurry/flurryx/actions/workflows/ci.yml">
+    <img src="https://img.shields.io/badge/coverage%20snapshot-62.85%25-f0ad4e" alt="Coverage snapshot 62.85%" />
+  </a>
+  <a href="https://angular.dev/">
+    <img src="https://img.shields.io/badge/Angular-%3E%3D17-dd0031" alt="Angular >=17" />
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" />
+  </a>
 </p>
 
-**Signal-first reactive state management for Angular.**
+<p align="center">
+  <strong>Signal-first reactive state management for Angular.</strong><br />
+  Bridge RxJS streams into cache-aware stores, keyed resources, mirrored state, and replayable history.
+</p>
+
+<p align="center">
+  <a href="https://fmflurry.github.io/flurryx/">Live demo</a>
+  ·
+  <a href="#feature-summary">Feature summary</a>
+  ·
+  <a href="#getting-started">Getting started</a>
+  ·
+  <a href="samples/taskflurry">Taskflurry sample</a>
+</p>
 
 > **See it in action** — [**Taskflurry**](https://fmflurry.github.io/flurryx/) is a live demo app built with Angular 21 (zoneless, no zone.js dependency) and flurryx. It showcases store definitions, the facade pattern with `@SkipIfCached` and `@Loading`, keyed resources with per-entity loading and errors, and Clean Architecture layering. Try the [live demo](https://fmflurry.github.io/flurryx/) or browse the [source code](samples/taskflurry).
 
-flurryx bridges the gap between RxJS async operations and Angular signals. Define a store, pipe your HTTP calls through an operator, read signals in your templates. No actions, no reducers, no effects boilerplate.
+flurryx bridges the gap between RxJS async operations and Angular signals. Define a store, pipe your HTTP calls through an operator, read signals in your templates, queue store messages when you need to batch updates, and replay history when you need deterministic state transitions. No actions, no reducers, no effects boilerplate.
+
+## Feature Summary
+
+| Capability | What flurryx gives you |
+| ---------- | ---------------------- |
+| Typed signal stores | Slot-based stores built from TypeScript types, with readonly `Signal<ResourceState<T>>` reads |
+| RxJS to signal bridge | `syncToStore` and `syncToKeyedStore` wire HTTP calls and streams straight into store lifecycle updates |
+| Loading and error state | Consistent `isLoading`, `status`, and normalized `errors` for every slot |
+| Cache-aware fetch flows | `@SkipIfCached` and `@Loading` handle deduplication, cache TTL, and loading flags close to the facade method |
+| Keyed entity caches | `KeyedResourceData` tracks loading, status, and errors per entity ID |
+| Invalidation helpers | `clear`, `clearAll`, `clearAllStores`, and `clearKeyedOne` cover slot-level and app-wide resets |
+| Store composition | Mirror state across stores with `.mirror()`, `.mirrorSelf()`, `.mirrorKeyed()`, `mirrorKey`, and `collectKeyed` |
+| Message queueing and history | `createStoreReplayController` queues typed store messages, records snapshots, and supports replay, undo, redo, and time travel |
+| Lean package surface | Use the umbrella `flurryx` package or the focused `@flurryx/core`, `@flurryx/store`, and `@flurryx/rx` packages |
+
+## Quick Example
+
+This is what using flurryx looks like in a typical Angular feature: define a store, expose it through a facade, then bind the resulting signals in a component.
 
 ```typescript
+import { Component, Injectable, inject } from "@angular/core";
+import { HttpClient } from "@angular/common/http";
+import { Loading, SkipIfCached, Store, syncToStore } from "flurryx";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+}
+
 // Store — declare your slots with a single interface
 interface ProductStoreConfig {
   LIST: Product[];
@@ -31,10 +84,13 @@ interface ProductStoreConfig {
 export const ProductStore = Store.for<ProductStoreConfig>().build();
 
 // Facade
-@Injectable()
+@Injectable({ providedIn: "root" })
 export class ProductFacade {
-  @SkipIfCached("LIST", (i) => i.store)
-  @Loading("LIST", (i) => i.store)
+  private readonly http = inject(HttpClient);
+  readonly store = inject(ProductStore);
+
+  @SkipIfCached("LIST", (instance: ProductFacade) => instance.store)
+  @Loading("LIST", (instance: ProductFacade) => instance.store)
   loadProducts() {
     this.http
       .get<Product[]>("/api/products")
@@ -59,11 +115,11 @@ export class ProductFacade {
     }
   `,
 })
-export class ProductListComponent implements OnInit {
+export class ProductListComponent {
   private readonly facade = inject(ProductFacade);
   readonly productsState = this.facade.getProducts();
 
-  ngOnInit() {
+  constructor() {
     this.facade.loadProducts();
   }
 }
@@ -75,6 +131,8 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
 
 ## Table of Contents
 
+- [Feature Summary](#feature-summary)
+- [Quick Example](#quick-example)
 - [Why flurryx?](#why-flurryx)
 - [Packages](#packages)
 - [How to Install](#how-to-install)
@@ -91,6 +149,7 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
   - [Constants](#constants)
 - [Keyed Resources](#keyed-resources)
 - [Clearing Store Data](#clearing-store-data)
+- [Message Queueing and History](#message-queueing-and-history)
 - [Store Mirroring](#store-mirroring)
   - [Builder .mirror()](#builder-mirror)
   - [Builder .mirrorSelf()](#builder-mirrorself)
@@ -114,8 +173,20 @@ Angular signals are great for synchronous reactivity, but real applications stil
 | Caching            | Custom `shareReplay` / `BehaviorSubject` wiring    | `@SkipIfCached` decorator, one line            |
 | Duplicate requests | Manual `distinctUntilChanged`, inflight tracking   | `@SkipIfCached` deduplicates while loading     |
 | Keyed resources    | Separate state per ID, boilerplate explosion       | `KeyedResourceData` with per-key loading/error |
+| Replay and history | Ad hoc logging, custom devtools plumbing           | Queue store messages, flush snapshots, undo, redo, and replay deterministically |
 
-flurryx gives you **one fluent builder**, **two RxJS operators**, and **two decorators**. That's the entire API.
+flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cache/loading decorators, store composition helpers, and a replay controller.
+
+---
+
+## Packages
+
+| Package | Purpose |
+| ------- | ------- |
+| `flurryx` | The umbrella package. Import the full toolkit from a single entry point. |
+| `@flurryx/core` | Shared types, keyed resource helpers, and cache constants. |
+| `@flurryx/store` | Signal-backed stores, invalidation helpers, mirroring utilities, and replay/history control. |
+| `@flurryx/rx` | RxJS bridge operators, decorators, and pluggable error normalization. |
 
 ---
 
@@ -706,6 +777,61 @@ export class InvoiceFacade {
 | `clearAll()` | Every slot in one store | Reset one feature store |
 | `clearAllStores()` | Every tracked store instance | Logout, tenant switch, full app cache reset |
 | `clearKeyedOne(key, resourceKey)` | Single entity in a keyed slot | Deleting or invalidating one cached item |
+
+---
+
+## Message Queueing and History
+
+When you need deterministic store updates, local event sourcing, or time-travel style debugging, flurryx exposes `createStoreReplayController`.
+
+It lets you queue typed store messages, flush them in order, record snapshots after each committed message, and move backward or forward through history.
+
+```typescript
+import { createStoreReplayController } from "flurryx";
+
+const controller = createStoreReplayController({
+  store,
+  keys: ["MESSAGES", "ACTIVE_THREAD"] as const,
+});
+
+controller.enqueue({
+  type: "startLoading",
+  key: "MESSAGES",
+});
+
+controller.enqueue({
+  type: "update",
+  key: "MESSAGES",
+  state: {
+    data: [{ id: "m-1", text: "hello" }],
+    status: "Success",
+  },
+});
+
+controller.flush();
+controller.undo();
+controller.redo();
+controller.travelTo(0);
+controller.replay();
+```
+
+**What it supports:**
+
+- Queueing updates before they touch the live store with `enqueue()`
+- Committing queued messages in order with `flush()`
+- Replaying committed history from the initial snapshot with `replay()`
+- Time travel with `travelTo(index)`, `undo()`, and `redo()`
+- Typed messages for `update`, `clear`, `clearAll`, `startLoading`, `stopLoading`, `updateKeyedOne`, `clearKeyedOne`, and `startKeyedLoading`
+- Safe snapshot cloning for rich objects such as `Date`, `Map`, `Set`, arrays, and nested objects
+
+**Why it matters:**
+
+- Batch multiple store mutations behind a single orchestration point
+- Reproduce tricky UI state transitions without ad hoc logging
+- Build debugging tools, dev panels, or optimistic flows on top of a consistent message stream
+- Model chat, queue-driven workflows, or audit-friendly state transitions with explicit history
+
+The replay controller only tracks the keys you register, so you can scope history to a single feature store or a narrow slice of state.
 
 ---
 

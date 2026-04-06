@@ -5,8 +5,8 @@ import type { ErrorNormalizer } from "./error-normalizer";
 /**
  * Error normalizer specialized for Angular's `HttpErrorResponse`.
  *
- * Import from the `flurryx/http` entry point to keep `@angular/common/http`
- * out of your bundle unless you actually need it.
+ * Import from `@flurryx/rx/http` or the aggregate `flurryx/http` entry point to
+ * keep `@angular/common/http` out of your bundle unless you actually need it.
  *
  * - If the response contains `error.errors` (array), returns it as-is.
  * - Otherwise, wraps `{ status, message }` into a single-element `ResourceErrors`.
@@ -14,7 +14,7 @@ import type { ErrorNormalizer } from "./error-normalizer";
  *
  * @example
  * ```ts
- * import { httpErrorNormalizer } from 'flurryx/http';
+ * import { httpErrorNormalizer } from '@flurryx/rx/http';
  *
  * this.http.get('/api/data')
  *   .pipe(syncToStore(this.store, 'DATA', { errorNormalizer: httpErrorNormalizer }))

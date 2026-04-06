@@ -61,6 +61,37 @@ function withoutKey<TKey extends KeyedResourceKey, TValue>(
   return next;
 }
 
+/**
+ * Syncs an Observable result into a keyed `ResourceState` slot on a Flurryx store.
+ *
+ * Each emission is written under `resourceKey` inside the slot's keyed data map.
+ * On success, that key is marked as `"Success"` and no longer loading. On error,
+ * the key is marked as `"Error"` and receives normalized errors.
+ *
+ * Use `mapResponse` when the Observable emits an API envelope and only part of it
+ * should be stored as the keyed entity value.
+ *
+ * By default, the operator completes after the first emission by applying `take(1)`.
+ *
+ * @template TEnum - Enum-like store keys used by `BaseStore`.
+ * @template TData - Store data shape.
+ * @template TStoreKey - Store key whose value is a keyed `ResourceState`.
+ * @template TKey - Entity key inside the keyed resource map.
+ * @template TValue - Entity type stored in the keyed slot.
+ * @template R - Raw Observable emission type.
+ * @param store - The target Flurryx store instance.
+ * @param storeKey - The keyed resource slot to update.
+ * @param resourceKey - The entity identifier inside the keyed slot.
+ * @param options - Optional response mapping, completion, finalization, and error normalization behavior.
+ * @returns An RxJS operator function that syncs source emissions into the keyed store slot.
+ *
+ * @example
+ * ```ts
+ * this.api.getUser(id).pipe(
+ *   syncToKeyedStore(this.store, "USERS", id)
+ * )
+ * ```
+ */
 export function syncToKeyedStore<
   TEnum extends Record<string, string | number>,
   TData extends { [K in keyof TEnum]: ResourceState<unknown> },
@@ -75,6 +106,29 @@ export function syncToKeyedStore<
   options?: SyncToKeyedStoreOptions<R, TValue>
 ): (source: Observable<R>) => Observable<R>;
 
+/**
+ * Syncs an Observable result into a keyed `ResourceState` slot on a Flurryx store.
+ *
+ * Each emission is written under `resourceKey` inside the slot's keyed data map.
+ * On success, that key is marked as `"Success"` and no longer loading. On error,
+ * the key is marked as `"Error"` and receives normalized errors.
+ *
+ * Use `mapResponse` when the Observable emits an API envelope and only part of it
+ * should be stored as the keyed entity value.
+ *
+ * By default, the operator completes after the first emission by applying `take(1)`.
+ *
+ * @template TData - Store data shape.
+ * @template TStoreKey - Store key whose value is a keyed `ResourceState`.
+ * @template TKey - Entity key inside the keyed resource map.
+ * @template TValue - Entity type stored in the keyed slot.
+ * @template R - Raw Observable emission type.
+ * @param store - The target Flurryx store instance.
+ * @param storeKey - The keyed resource slot to update.
+ * @param resourceKey - The entity identifier inside the keyed slot.
+ * @param options - Optional response mapping, completion, finalization, and error normalization behavior.
+ * @returns An RxJS operator function that syncs source emissions into the keyed store slot.
+ */
 export function syncToKeyedStore<
   TData extends { [K in keyof TData]: ResourceState<unknown> },
   TStoreKey extends keyof TData,

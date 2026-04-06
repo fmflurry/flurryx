@@ -32,6 +32,30 @@ interface SyncToStoreRuntimeStore {
   update(key: PropertyKey, newState: unknown): void;
 }
 
+/**
+ * Syncs an Observable result into a `ResourceState` slot on a Flurryx store.
+ *
+ * On success, the target slot is updated with the emitted value, `status: "Success"`,
+ * and `isLoading: false`. On error, the slot is updated with `status: "Error"`
+ * and normalized errors.
+ *
+ * By default, the operator completes after the first emission by applying `take(1)`.
+ *
+ * @template TEnum - Enum-like store keys used by `BaseStore`.
+ * @template TData - Store data shape.
+ * @template K - Store key whose value is a `ResourceState`.
+ * @param store - The target Flurryx store instance.
+ * @param key - The resource slot to update.
+ * @param options - Optional behavior for completion, finalization, and error normalization.
+ * @returns An RxJS operator function that syncs source emissions into the store.
+ *
+ * @example
+ * ```ts
+ * this.api.getUsers().pipe(
+ *   syncToStore(this.store, "USERS")
+ * )
+ * ```
+ */
 export function syncToStore<
   TEnum extends Record<string, string | number>,
   TData extends { [K in keyof TEnum]: ResourceState<unknown> },
@@ -42,6 +66,22 @@ export function syncToStore<
   options?: SyncToStoreOptions
 ): <R>(source: Observable<R>) => Observable<R>;
 
+/**
+ * Syncs an Observable result into a `ResourceState` slot on a Flurryx store.
+ *
+ * On success, the target slot is updated with the emitted value, `status: "Success"`,
+ * and `isLoading: false`. On error, the slot is updated with `status: "Error"`
+ * and normalized errors.
+ *
+ * By default, the operator completes after the first emission by applying `take(1)`.
+ *
+ * @template TData - Store data shape.
+ * @template K - Store key whose value is a `ResourceState`.
+ * @param store - The target Flurryx store instance.
+ * @param key - The resource slot to update.
+ * @param options - Optional behavior for completion, finalization, and error normalization.
+ * @returns An RxJS operator function that syncs source emissions into the store.
+ */
 export function syncToStore<
   TData extends { [K in keyof TData]: ResourceState<unknown> },
   K extends keyof TData

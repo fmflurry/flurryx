@@ -16,7 +16,7 @@ export function trackStore(store: Clearable): void {
  *
  * @example
  * ```ts
- * import { clearAllStores } from 'flurryx';
+ * import { clearAllStores } from '@flurryx/store';
  *
  * logout() {
  *   clearAllStores();

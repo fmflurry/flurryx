@@ -6,4 +6,39 @@ export { mirrorKey } from "./mirror-key";
 export { collectKeyed } from "./collect-keyed";
 export type { MirrorOptions } from "./mirror-key";
 export type { CollectKeyedOptions } from "./collect-keyed";
-export type { IStore, ConfigToData } from "./types";
+export type { IStore, ConfigToData, StoreOptions } from "./types";
+export { cloneValue, createSnapshotRestorePatch } from "./store-clone";
+export {
+  createInMemoryStoreMessageChannel,
+  createStorageStoreMessageChannel,
+  createLocalStorageStoreMessageChannel,
+  createSessionStorageStoreMessageChannel,
+  createCompositeStoreMessageChannel,
+} from "./store-channels";
+export type {
+  StoreMessageRecord,
+  StoreMessageChannel,
+  StoreMessageChannelStorage,
+  StoreMessageChannelOptions,
+  CompositeStoreMessageChannelOptions,
+  StorageStoreMessageChannelOptions,
+  BrowserStorageStoreMessageChannelOptions,
+} from "./store-channels";
+export type {
+  StoreMessage,
+  StoreSnapshot,
+  StoreMessageStatus,
+  UpdateStoreMessage,
+  ClearStoreMessage,
+  ClearAllStoreMessage,
+  StartLoadingStoreMessage,
+  StopLoadingStoreMessage,
+  UpdateKeyedOneStoreMessage,
+  ClearKeyedOneStoreMessage,
+  StartKeyedLoadingStoreMessage,
+} from "./store-messages";
+export type {
+  StoreDeadLetterEntry,
+  StoreHistory,
+  StoreHistoryEntry,
+} from "./store-replay";

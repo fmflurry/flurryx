@@ -1,13 +1,26 @@
 import { signal, type Signal, WritableSignal } from "@angular/core";
+import { ResourceState, type KeyedResourceKey } from "@flurryx/core";
+import type { IStore, StoreDataShape, StoreKey, StoreOptions } from "./types";
+import { cloneValue } from "./store-clone";
 import {
-  ResourceState,
-  isAnyKeyLoading,
-  isKeyedResourceData,
-  createKeyedResourceData,
-  type KeyedResourceKey,
-} from "@flurryx/core";
-import type { IStore } from "./types";
+  createStoreHistory,
+  type StoreHistoryDriver,
+  type StoreHistoryEntry,
+} from "./store-replay";
+import type { StoreMessageRecord } from "./store-channels";
 import { trackStore } from "./store-registry";
+import {
+  createDefaultState,
+  createStoreMessageConsumer,
+  createUpdateMessage,
+  createClearMessage,
+  createClearAllMessage,
+  createStartLoadingMessage,
+  createStopLoadingMessage,
+  createUpdateKeyedOneMessage,
+  createClearKeyedOneMessage,
+  createStartKeyedLoadingMessage,
+} from "./store-message-consumer";
 
 type UpdateHooksMap = Map<
   unknown,
@@ -35,17 +48,103 @@ const updateHooksMap = new WeakMap<object, UpdateHooksMap>();
  */
 export abstract class BaseStore<
   TEnum extends Record<string, string | number>,
-  TData extends { [K in keyof TEnum]: ResourceState<unknown> }
+  TData extends StoreDataShape<TData> & {
+    [K in keyof TEnum]: ResourceState<unknown>;
+  }
 > implements IStore<TData>
 {
   private readonly signalsState = new Map<
-    keyof TEnum,
-    WritableSignal<TData[keyof TEnum]>
+    string,
+    WritableSignal<ResourceState<unknown>>
   >();
+  private readonly storeKeys: readonly StoreKey<TData>[];
+  private readonly history: StoreHistoryDriver<TData>;
 
-  protected constructor(protected readonly storeEnum: TEnum) {
+  readonly travelTo = (index: number): void => this.history.travelTo(index);
+
+  readonly undo = (): boolean => this.history.undo();
+
+  readonly redo = (): boolean => this.history.redo();
+
+  readonly getDeadLetters = () => this.history.getDeadLetters();
+
+  readonly replayDeadLetter = (id: number): boolean =>
+    this.history.replayDeadLetter(id);
+
+  readonly replayDeadLetters = (): number => this.history.replayDeadLetters();
+
+  readonly getCurrentIndex = () => this.history.getCurrentIndex();
+
+  replay(id: number): number;
+
+  replay(ids: readonly number[]): number;
+
+  replay(idOrIds: number | readonly number[]): number {
+    if (Array.isArray(idOrIds)) {
+      return this.history.replay(idOrIds as readonly number[]);
+    }
+
+    return this.history.replay(idOrIds as number);
+  }
+
+  getHistory(): readonly StoreHistoryEntry<TData>[];
+
+  getHistory<K extends StoreKey<TData>>(
+    key: K
+  ): readonly StoreHistoryEntry<TData, K>[];
+
+  getHistory<K extends StoreKey<TData>>(key?: K) {
+    if (key === undefined) {
+      return this.history.getHistory();
+    }
+
+    return this.history.getHistory(key);
+  }
+
+  getMessages(): readonly StoreMessageRecord<TData>[];
+
+  getMessages<K extends StoreKey<TData>>(
+    key: K
+  ): readonly StoreMessageRecord<TData, K>[];
+
+  getMessages<K extends StoreKey<TData>>(key?: K) {
+    if (key === undefined) {
+      return this.history.getMessages();
+    }
+
+    return this.history.getMessages(key);
+  }
+
+  protected constructor(
+    protected readonly storeEnum: TEnum,
+    options?: StoreOptions<TData>
+  ) {
+    this.storeKeys = Object.keys(storeEnum) as StoreKey<TData>[];
     this.initializeState();
     updateHooksMap.set(this, new Map());
+
+    const consumer = createStoreMessageConsumer<TData>(
+      {
+        getOrCreate: <K extends StoreKey<TData>>(key: K) =>
+          this.signalsState.get(key) as WritableSignal<TData[K]>,
+        getAllKeys: () => this.storeKeys,
+      },
+      {
+        notify: <K extends StoreKey<TData>>(
+          key: K,
+          next: TData[K],
+          prev: TData[K]
+        ) => this.notifyUpdateHooks(key, next, prev),
+      }
+    );
+
+    this.history = createStoreHistory<TData>({
+      captureSnapshot: () => consumer.createSnapshot(),
+      applySnapshot: (snapshot) => consumer.applySnapshot(snapshot),
+      applyMessage: (message) => consumer.applyMessage(message),
+      channel: options?.channel,
+    });
+
     trackStore(this);
   }
 
@@ -55,7 +154,7 @@ export abstract class BaseStore<
    * @param key - The slot name to read.
    * @returns A `Signal` wrapping the slot's current {@link ResourceState}.
    */
-  get<K extends keyof TData>(key: K): Signal<TData[K]> {
+  get<K extends StoreKey<TData>>(key: K): Signal<TData[K]> {
     return this.signalsState.get(key.toString()) as unknown as Signal<TData[K]>;
   }
 
@@ -66,7 +165,7 @@ export abstract class BaseStore<
    * @param callback - Receives the new state and the previous state.
    * @returns A cleanup function that removes the listener when called.
    */
-  onUpdate<K extends keyof TData>(
+  onUpdate<K extends StoreKey<TData>>(
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void
   ): () => void {
@@ -106,27 +205,15 @@ export abstract class BaseStore<
    * @param key - The slot to update.
    * @param newState - Partial state to merge (e.g. `{ data: newData, status: 'Success' }`).
    */
-  update<K extends keyof TData>(key: K, newState: Partial<TData[K]>): void {
-    const currentState = this.signalsState.get(key.toString());
-    if (!currentState) {
-      return;
-    }
-
-    const previousState = currentState() as TData[K];
-    currentState.update((state) => ({
-      ...state,
-      ...newState,
-    }));
-
-    const updatedState = currentState() as TData[K];
-    this.notifyUpdateHooks(key, updatedState, previousState);
+  update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void {
+    this.history.publish(
+      createUpdateMessage<TData, K>(key, cloneValue(newState))
+    );
   }
 
   /** Resets every slot in this store to its initial idle state. */
   clearAll(): void {
-    Object.keys(this.storeEnum).forEach((key) => {
-      this.clear(key as keyof TData);
-    });
+    this.history.publish(createClearAllMessage<TData>());
   }
 
   /**
@@ -134,23 +221,8 @@ export abstract class BaseStore<
    *
    * @param key - The slot to clear.
    */
-  clear<K extends keyof TData>(key: K): void {
-    const currentState = this.signalsState.get(key.toString());
-    if (!currentState) {
-      return;
-    }
-
-    const previousState = currentState() as TData[K];
-    const _typedKey = key as keyof TEnum;
-    currentState.set({
-      data: undefined,
-      isLoading: false,
-      status: undefined,
-      errors: undefined,
-    } as TData[typeof _typedKey]);
-
-    const nextState = currentState() as TData[K];
-    this.notifyUpdateHooks(key, nextState, previousState);
+  clear<K extends StoreKey<TData>>(key: K): void {
+    this.history.publish(createClearMessage<TData, K>(key));
   }
 
   /**
@@ -158,22 +230,8 @@ export abstract class BaseStore<
    *
    * @param key - The slot to mark as loading.
    */
-  startLoading<K extends keyof TData>(key: K): void {
-    const currentState = this.signalsState.get(key.toString());
-    if (!currentState) {
-      return;
-    }
-
-    const _typedKey = key as keyof TEnum;
-    currentState.update(
-      (state) =>
-        ({
-          ...state,
-          status: undefined,
-          isLoading: true,
-          errors: undefined,
-        } as TData[typeof _typedKey])
-    );
+  startLoading<K extends StoreKey<TData>>(key: K): void {
+    this.history.publish(createStartLoadingMessage<TData, K>(key));
   }
 
   /**
@@ -182,20 +240,8 @@ export abstract class BaseStore<
    *
    * @param key - The slot to stop loading.
    */
-  stopLoading<K extends keyof TData>(key: K): void {
-    const currentState = this.signalsState.get(key.toString());
-    if (!currentState) {
-      return;
-    }
-
-    const _typedKey = key as keyof TEnum;
-    currentState.update(
-      (state) =>
-        ({
-          ...state,
-          isLoading: false,
-        } as TData[typeof _typedKey])
-    );
+  stopLoading<K extends StoreKey<TData>>(key: K): void {
+    this.history.publish(createStopLoadingMessage<TData, K>(key));
   }
 
   /**
@@ -207,47 +253,18 @@ export abstract class BaseStore<
    * @param resourceKey - The entity identifier (e.g. `'inv-123'`).
    * @param entity - The entity value to store.
    */
-  updateKeyedOne<K extends keyof TData>(
+  updateKeyedOne<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey,
     entity: unknown
   ): void {
-    const currentState = this.signalsState.get(key.toString());
-    if (!currentState) {
-      return;
-    }
-
-    const state = currentState();
-    const data = isKeyedResourceData(state.data)
-      ? state.data
-      : createKeyedResourceData();
-
-    const nextErrors = { ...data.errors };
-    delete nextErrors[resourceKey];
-
-    const nextData = {
-      ...data,
-      entities: {
-        ...data.entities,
-        [resourceKey]: entity,
-      },
-      isLoading: {
-        ...data.isLoading,
-        [resourceKey]: false,
-      },
-      status: {
-        ...data.status,
-        [resourceKey]: "Success" as const,
-      },
-      errors: nextErrors,
-    };
-
-    this.update(key, {
-      data: nextData as unknown,
-      isLoading: isAnyKeyLoading(nextData.isLoading),
-      status: undefined,
-      errors: undefined,
-    } as Partial<TData[K]>);
+    this.history.publish(
+      createUpdateKeyedOneMessage<TData, K>(
+        key,
+        resourceKey,
+        cloneValue(entity)
+      )
+    );
   }
 
   /**
@@ -258,57 +275,13 @@ export abstract class BaseStore<
    * @param key - The keyed slot name.
    * @param resourceKey - The entity identifier to remove.
    */
-  clearKeyedOne<K extends keyof TData>(
+  clearKeyedOne<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
-    const currentState = this.signalsState.get(key.toString());
-    if (!currentState) {
-      return;
-    }
-
-    const previousState = currentState() as TData[K];
-    const state = previousState as ResourceState<unknown>;
-    if (!isKeyedResourceData(state.data)) {
-      return;
-    }
-
-    const data = state.data;
-
-    const nextEntities = { ...data.entities };
-    delete nextEntities[resourceKey];
-
-    const nextIsLoading = { ...data.isLoading };
-    delete nextIsLoading[resourceKey];
-
-    const nextStatus = { ...data.status };
-    delete nextStatus[resourceKey];
-
-    const nextErrors = { ...data.errors };
-    delete nextErrors[resourceKey];
-
-    const nextData = {
-      ...data,
-      entities: nextEntities,
-      isLoading: nextIsLoading,
-      status: nextStatus,
-      errors: nextErrors,
-    };
-
-    const _typedKey = key as keyof TEnum;
-    currentState.update(
-      (prev) =>
-        ({
-          ...prev,
-          data: nextData as unknown,
-          status: undefined,
-          isLoading: isAnyKeyLoading(nextIsLoading),
-          errors: undefined,
-        } as TData[typeof _typedKey])
+    this.history.publish(
+      createClearKeyedOneMessage<TData, K>(key, resourceKey)
     );
-
-    const updatedState = currentState() as TData[K];
-    this.notifyUpdateHooks(key, updatedState, previousState);
   }
 
   /**
@@ -319,63 +292,16 @@ export abstract class BaseStore<
    * @param key - The keyed slot name.
    * @param resourceKey - The entity identifier to mark as loading.
    */
-  startKeyedLoading<K extends keyof TData>(
+  startKeyedLoading<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
-    const currentState = this.signalsState.get(key.toString());
-    if (!currentState) {
-      return;
-    }
-
-    const _typedKey = key as keyof TEnum;
-    const state = currentState();
-    if (!isKeyedResourceData(state.data)) {
-      this.startLoading(key);
-      return;
-    }
-
-    const previousState = state as TData[K];
-    const data = state.data;
-
-    const nextIsLoading = {
-      ...data.isLoading,
-      [resourceKey]: true,
-    } as typeof data.isLoading;
-
-    const nextStatus: typeof data.status = {
-      ...data.status,
-    };
-    delete nextStatus[resourceKey];
-
-    const nextErrors: typeof data.errors = {
-      ...data.errors,
-    };
-    delete nextErrors[resourceKey];
-
-    const nextData = {
-      ...data,
-      isLoading: nextIsLoading,
-      status: nextStatus,
-      errors: nextErrors,
-    };
-
-    currentState.update(
-      (previous) =>
-        ({
-          ...previous,
-          data: nextData,
-          status: undefined,
-          isLoading: isAnyKeyLoading(nextIsLoading),
-          errors: undefined,
-        } as TData[typeof _typedKey])
+    this.history.publish(
+      createStartKeyedLoadingMessage<TData, K>(key, resourceKey)
     );
-
-    const updatedState = currentState() as TData[K];
-    this.notifyUpdateHooks(key, updatedState, previousState);
   }
 
-  private notifyUpdateHooks<K extends keyof TData>(
+  private notifyUpdateHooks<K extends StoreKey<TData>>(
     key: K,
     nextState: TData[K],
     previousState: TData[K]
@@ -395,17 +321,10 @@ export abstract class BaseStore<
   }
 
   private initializeState(): void {
-    Object.keys(this.storeEnum).forEach((key) => {
-      const _typedKey = key as keyof TEnum;
-      const initialState: ResourceState<unknown> = {
-        data: undefined,
-        isLoading: false,
-        status: undefined,
-        errors: undefined,
-      };
+    this.storeKeys.forEach((key) => {
       this.signalsState.set(
-        _typedKey,
-        signal<TData[typeof _typedKey]>(initialState as TData[typeof _typedKey])
+        key,
+        signal<TData[typeof key]>(createDefaultState() as TData[typeof key])
       );
     });
   }

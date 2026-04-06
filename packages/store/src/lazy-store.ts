@@ -1,27 +1,31 @@
 import { signal, type Signal, WritableSignal } from "@angular/core";
+import { type ResourceState, type KeyedResourceKey } from "@flurryx/core";
+import type { IStore, StoreDataShape, StoreKey, StoreOptions } from "./types";
+import { cloneValue } from "./store-clone";
 import {
-  isAnyKeyLoading,
-  isKeyedResourceData,
-  createKeyedResourceData,
-  type ResourceState,
-  type KeyedResourceKey,
-} from "@flurryx/core";
-import type { IStore, StoreDataShape, StoreKey } from "./types";
+  createStoreHistory,
+  type StoreHistoryDriver,
+  type StoreHistoryEntry,
+} from "./store-replay";
+import type { StoreMessageRecord } from "./store-channels";
 import { trackStore } from "./store-registry";
+import {
+  createDefaultState,
+  createStoreMessageConsumer,
+  createUpdateMessage,
+  createClearMessage,
+  createClearAllMessage,
+  createStartLoadingMessage,
+  createStopLoadingMessage,
+  createUpdateKeyedOneMessage,
+  createClearKeyedOneMessage,
+  createStartKeyedLoadingMessage,
+} from "./store-message-consumer";
 
 type UpdateCallback = (
   nextState: ResourceState<unknown>,
   previousState: ResourceState<unknown>
 ) => void;
-
-function createDefaultState<T>(): ResourceState<T> {
-  return {
-    data: undefined,
-    isLoading: false,
-    status: undefined,
-    errors: undefined,
-  };
-}
 
 /**
  * Lazy store that creates signals on first access.
@@ -36,8 +40,86 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     WritableSignal<ResourceState<unknown>>
   >();
   private readonly hooks = new Map<string, UpdateCallback[]>();
+  private readonly history: StoreHistoryDriver<TData>;
 
-  constructor() {
+  readonly travelTo = (index: number): void => this.history.travelTo(index);
+
+  readonly undo = (): boolean => this.history.undo();
+
+  readonly redo = (): boolean => this.history.redo();
+
+  getMessages(): readonly StoreMessageRecord<TData>[];
+
+  getMessages<K extends StoreKey<TData>>(
+    key: K
+  ): readonly StoreMessageRecord<TData, K>[];
+
+  getMessages<K extends StoreKey<TData>>(key?: K) {
+    if (key === undefined) {
+      return this.history.getMessages();
+    }
+
+    return this.history.getMessages(key);
+  }
+
+  readonly getDeadLetters = () => this.history.getDeadLetters();
+
+  readonly replayDeadLetter = (id: number): boolean =>
+    this.history.replayDeadLetter(id);
+
+  readonly replayDeadLetters = (): number => this.history.replayDeadLetters();
+
+  readonly getCurrentIndex = () => this.history.getCurrentIndex();
+
+  replay(id: number): number;
+
+  replay(ids: readonly number[]): number;
+
+  replay(idOrIds: number | readonly number[]): number {
+    if (Array.isArray(idOrIds)) {
+      return this.history.replay(idOrIds as readonly number[]);
+    }
+
+    return this.history.replay(idOrIds as number);
+  }
+
+  getHistory(): readonly StoreHistoryEntry<TData>[];
+
+  getHistory<K extends StoreKey<TData>>(
+    key: K
+  ): readonly StoreHistoryEntry<TData, K>[];
+
+  getHistory<K extends StoreKey<TData>>(key?: K) {
+    if (key === undefined) {
+      return this.history.getHistory();
+    }
+
+    return this.history.getHistory(key);
+  }
+
+  constructor(options?: StoreOptions<TData>) {
+    const consumer = createStoreMessageConsumer<TData>(
+      {
+        getOrCreate: <K extends StoreKey<TData>>(key: K) =>
+          this.getOrCreate(key),
+        getAllKeys: () => this.signals.keys() as Iterable<StoreKey<TData>>,
+      },
+      {
+        notify: <K extends StoreKey<TData>>(
+          key: K,
+          next: TData[K],
+          prev: TData[K]
+        ) => this.notifyHooks(key, next, prev),
+      }
+    );
+
+    this.history = createStoreHistory<TData>({
+      captureSnapshot: () => consumer.createSnapshot(),
+      applySnapshot: (snapshot) => consumer.applySnapshot(snapshot),
+      applyMessage: (message) => consumer.applyMessage(message),
+      channel: options?.channel,
+    });
+
     trackStore(this);
   }
 
@@ -52,181 +134,74 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     return sig as WritableSignal<TData[K]>;
   }
 
+  /** @inheritDoc */
   get<K extends StoreKey<TData>>(key: K): Signal<TData[K]> {
     return this.getOrCreate(key);
   }
 
+  /** @inheritDoc */
   update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void {
-    const sig = this.getOrCreate(key);
-    const previousState = sig();
-    sig.update((state) => ({ ...state, ...newState }));
-    const nextState = sig();
-    this.notifyHooks(key, nextState, previousState);
+    this.history.publish(
+      createUpdateMessage<TData, K>(key, cloneValue(newState))
+    );
   }
 
+  /** @inheritDoc */
   clear<K extends StoreKey<TData>>(key: K): void {
-    const sig = this.getOrCreate(key);
-    const previousState = sig();
-    sig.set(createDefaultState() as TData[K]);
-    const nextState = sig();
-    this.notifyHooks(key, nextState, previousState);
+    this.history.publish(createClearMessage<TData, K>(key));
   }
 
+  /** @inheritDoc */
   clearAll(): void {
-    for (const key of this.signals.keys()) {
-      this.clear(key as StoreKey<TData>);
-    }
+    this.history.publish(createClearAllMessage<TData>());
   }
 
+  /** @inheritDoc */
   startLoading<K extends StoreKey<TData>>(key: K): void {
-    const sig = this.getOrCreate(key);
-    sig.update(
-      (state) =>
-        ({
-          ...state,
-          status: undefined,
-          isLoading: true,
-          errors: undefined,
-        } as TData[K])
-    );
+    this.history.publish(createStartLoadingMessage<TData, K>(key));
   }
 
+  /** @inheritDoc */
   stopLoading<K extends StoreKey<TData>>(key: K): void {
-    const sig = this.getOrCreate(key);
-    sig.update(
-      (state) =>
-        ({
-          ...state,
-          isLoading: false,
-        } as TData[K])
-    );
+    this.history.publish(createStopLoadingMessage<TData, K>(key));
   }
 
+  /** @inheritDoc */
   updateKeyedOne<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey,
     entity: unknown
   ): void {
-    const sig = this.getOrCreate(key);
-    const state = sig();
-    const data = isKeyedResourceData(state.data)
-      ? state.data
-      : createKeyedResourceData();
-
-    const nextErrors = { ...data.errors };
-    delete nextErrors[resourceKey];
-
-    const nextData = {
-      ...data,
-      entities: { ...data.entities, [resourceKey]: entity },
-      isLoading: { ...data.isLoading, [resourceKey]: false },
-      status: { ...data.status, [resourceKey]: "Success" as const },
-      errors: nextErrors,
-    };
-
-    this.update(key, {
-      data: nextData as unknown,
-      isLoading: isAnyKeyLoading(nextData.isLoading),
-      status: undefined,
-      errors: undefined,
-    } as Partial<TData[K]>);
+    this.history.publish(
+      createUpdateKeyedOneMessage<TData, K>(
+        key,
+        resourceKey,
+        cloneValue(entity)
+      )
+    );
   }
 
+  /** @inheritDoc */
   clearKeyedOne<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
-    const sig = this.getOrCreate(key);
-    const state = sig();
-    if (!isKeyedResourceData(state.data)) {
-      return;
-    }
-
-    const data = state.data;
-    const previousState = state;
-
-    const nextEntities = { ...data.entities };
-    delete nextEntities[resourceKey];
-
-    const nextIsLoading = { ...data.isLoading };
-    delete nextIsLoading[resourceKey];
-
-    const nextStatus = { ...data.status };
-    delete nextStatus[resourceKey];
-
-    const nextErrors = { ...data.errors };
-    delete nextErrors[resourceKey];
-
-    const nextData = {
-      ...data,
-      entities: nextEntities,
-      isLoading: nextIsLoading,
-      status: nextStatus,
-      errors: nextErrors,
-    };
-
-    sig.update(
-      (prev) =>
-        ({
-          ...prev,
-          data: nextData as unknown,
-          status: undefined,
-          isLoading: isAnyKeyLoading(nextIsLoading),
-          errors: undefined,
-        } as TData[K])
+    this.history.publish(
+      createClearKeyedOneMessage<TData, K>(key, resourceKey)
     );
-
-    const updatedState = sig();
-    this.notifyHooks(key, updatedState, previousState);
   }
 
+  /** @inheritDoc */
   startKeyedLoading<K extends StoreKey<TData>>(
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
-    const sig = this.getOrCreate(key);
-    const state = sig();
-    if (!isKeyedResourceData(state.data)) {
-      this.startLoading(key);
-      return;
-    }
-
-    const previousState = state;
-    const data = state.data;
-
-    const nextIsLoading = {
-      ...data.isLoading,
-      [resourceKey]: true,
-    } as typeof data.isLoading;
-
-    const nextStatus: typeof data.status = { ...data.status };
-    delete nextStatus[resourceKey];
-
-    const nextErrors: typeof data.errors = { ...data.errors };
-    delete nextErrors[resourceKey];
-
-    const nextData = {
-      ...data,
-      isLoading: nextIsLoading,
-      status: nextStatus,
-      errors: nextErrors,
-    };
-
-    sig.update(
-      (previous) =>
-        ({
-          ...previous,
-          data: nextData,
-          status: undefined,
-          isLoading: isAnyKeyLoading(nextIsLoading),
-          errors: undefined,
-        } as TData[K])
+    this.history.publish(
+      createStartKeyedLoadingMessage<TData, K>(key, resourceKey)
     );
-
-    const updatedState = sig();
-    this.notifyHooks(key, updatedState, previousState);
   }
 
+  /** @inheritDoc */
   onUpdate<K extends StoreKey<TData>>(
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void

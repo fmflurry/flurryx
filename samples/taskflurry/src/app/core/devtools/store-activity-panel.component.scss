@@ -1,0 +1,363 @@
+// ------------------------------------------------------------------
+// Design tokens
+// ------------------------------------------------------------------
+$panel-w: 360px;
+$radius: 12px;
+$radius-sm: 8px;
+
+$ink: #0f172a;
+$ink2: #1e293b;
+$ink3: #334155;
+$subtle: #64748b;
+$faint: #94a3b8;
+$wash: #f1f5f9;
+$white: #fff;
+$accent: #6366f1;
+$accent-soft: #eef2ff;
+$green: #22c55e;
+$green-soft: #f0fdf4;
+$amber: #f59e0b;
+$amber-soft: #fffbeb;
+$red: #ef4444;
+$red-soft: #fef2f2;
+
+// ------------------------------------------------------------------
+// FAB
+// ------------------------------------------------------------------
+.sap-fab {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 10001;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: $accent;
+  color: $white;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba($accent, 0.35), 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba($accent, 0.4), 0 2px 6px rgba(0, 0, 0, 0.1);
+  }
+  &:active { transform: scale(0.95); }
+
+  &--open {
+    background: $ink;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    &:hover { box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); }
+  }
+
+  &__icon { line-height: 1; }
+
+  &__badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    background: $red;
+    color: $white;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+}
+
+// ------------------------------------------------------------------
+// Panel
+// ------------------------------------------------------------------
+.sap {
+  position: fixed;
+  bottom: 78px;
+  right: 20px;
+  z-index: 10000;
+  width: min($panel-w, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 110px));
+  background: $white;
+  border-radius: $radius;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: $ink;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
+  overflow: hidden;
+  animation: sap-enter 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes sap-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+// ------------------------------------------------------------------
+// Header
+// ------------------------------------------------------------------
+.sap__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid $wash;
+  gap: 8px;
+}
+
+.sap__stores { display: flex; gap: 4px; }
+
+.sap__store {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: $subtle;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover { background: $wash; color: $ink; }
+  &--on { background: $accent-soft; color: $accent; border-color: rgba($accent, 0.15); font-weight: 600; }
+}
+
+.sap__controls { display: flex; align-items: center; gap: 2px; }
+
+.sap__ctrl {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: $ink3;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  &:hover:not(:disabled) { background: $wash; color: $accent; }
+  &:disabled { color: $faint; cursor: default; opacity: 0.4; }
+  &--refresh { margin-left: 4px; }
+}
+
+.sap__pos {
+  font-size: 11px;
+  font-weight: 600;
+  color: $ink3;
+  min-width: 36px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sap__pos-sep { color: $faint; }
+
+// ------------------------------------------------------------------
+// Tabs
+// ------------------------------------------------------------------
+.sap__tabs {
+  display: flex;
+  padding: 0 12px;
+  border-bottom: 1px solid $wash;
+  gap: 4px;
+}
+
+.sap__tab {
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: $subtle;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s;
+  &:hover { color: $ink; }
+  &--on { color: $accent; border-bottom-color: $accent; font-weight: 600; }
+}
+
+// ------------------------------------------------------------------
+// Body (scrollable)
+// ------------------------------------------------------------------
+.sap__body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.sap__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 32px 16px;
+  color: $faint;
+  font-size: 12px;
+  &-icon { font-size: 24px; }
+}
+
+// ------------------------------------------------------------------
+// Timeline items (history) — each item is a clickable button
+// ------------------------------------------------------------------
+.sap__item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px 8px 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  color: $ink;
+  cursor: pointer;
+  transition: background 0.12s;
+  font-family: inherit;
+  font-size: inherit;
+
+  &:hover:not(:disabled) { background: $wash; }
+  &:disabled { cursor: default; }
+
+  &--active {
+    background: $accent-soft;
+    &:hover { background: $accent-soft; }
+  }
+  &--future { opacity: 0.4; }
+}
+
+.sap__dot {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 3px;
+  flex-shrink: 0;
+  background: $wash;
+  border: 2px solid $faint;
+  z-index: 1;
+
+  .sap__item--active & {
+    background: $accent;
+    border-color: $accent;
+    box-shadow: 0 0 0 3px rgba($accent, 0.2);
+  }
+  .sap__item--past & { background: $green; border-color: $green; }
+  .sap__item--future & { background: $wash; border-color: #cbd5e1; }
+}
+
+.sap__connector {
+  position: absolute;
+  left: 16px;
+  top: 21px;
+  bottom: -1px;
+  width: 2px;
+  background: $wash;
+}
+
+.sap__item-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+.sap__item-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: $ink;
+  .sap__item--active & { color: $accent; }
+}
+
+.sap__item-detail {
+  font-size: 11px;
+  color: $subtle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+.sap__item-time {
+  font-size: 10px;
+  color: $faint;
+  white-space: nowrap;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+// ------------------------------------------------------------------
+// Message rows
+// ------------------------------------------------------------------
+.sap__msg {
+  padding: 8px 12px;
+  border-bottom: 1px solid $wash;
+  &:last-child { border-bottom: none; }
+}
+
+.sap__msg-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sap__msg-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: $ink;
+}
+
+.sap__msg-key {
+  flex: 1;
+  font-size: 11px;
+  color: $subtle;
+  font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sap__msg-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: capitalize;
+  flex-shrink: 0;
+
+  &[data-status='acknowledged'] { background: $green-soft; color: $green; }
+  &[data-status='pending'] { background: $amber-soft; color: $amber; }
+  &[data-status='dead-letter'] { background: $red-soft; color: $red; }
+}
+
+.sap__msg-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.sap__msg-meta {
+  font-size: 10px;
+  color: $faint;
+  font-variant-numeric: tabular-nums;
+}
+
+.sap__msg-action {
+  padding: 2px 8px;
+  border: 1px solid rgba($accent, 0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: $accent;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover { background: $accent-soft; border-color: $accent; }
+}

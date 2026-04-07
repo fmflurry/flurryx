@@ -1,0 +1,37 @@
+<!-- Toggle + undo/redo bar -->
+<div class="shv-bar">
+  <button class="shv-bar__toggle" (click)="toggleHistory()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    History
+    <span class="shv-bar__count">{{ history().length - 1 }}</span>
+    <svg class="shv-bar__chevron" [class.shv-bar__chevron--open]="showHistory()" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+  </button>
+
+</div>
+
+<!-- Timeline -->
+@if (showHistory()) {
+  <div class="shv-timeline">
+    @for (entry of history(); track entry.index; let last = $last) {
+      <button
+        class="shv-entry"
+        [class.shv-entry--current]="entry.index === currentIndex()"
+        [class.shv-entry--past]="entry.index < currentIndex()"
+        [class.shv-entry--future]="entry.index > currentIndex()"
+        (click)="travelTo(entry.index)"
+      >
+        <div class="shv-entry__track">
+          <span class="shv-entry__dot"></span>
+          @if (!last) { <span class="shv-entry__line"></span> }
+        </div>
+        <div class="shv-entry__content">
+          <span class="shv-entry__label">{{ entryLabel(entry) }}</span>
+          @if (entryDetail(entry); as detail) {
+            <span class="shv-entry__detail">{{ detail }}</span>
+          }
+        </div>
+        <span class="shv-entry__time">{{ entryTime(entry) }}</span>
+      </button>
+    }
+  </div>
+}

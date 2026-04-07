@@ -235,6 +235,53 @@ describe("built-in store broker history", () => {
     expect(store.undo()).toBe(false);
   });
 
+  it("keeps history signal references stable across unchanged reads and appends", () => {
+    const initialHistory = store.history();
+
+    expect(store.history()).toBe(initialHistory);
+    expect(initialHistory).toHaveLength(1);
+
+    store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+
+    const firstUpdateHistory = store.history();
+
+    expect(store.history()).toBe(firstUpdateHistory);
+    expect(firstUpdateHistory).not.toBe(initialHistory);
+    expect(firstUpdateHistory[0]).toBe(initialHistory[0]);
+
+    store.update(ReplayStoreEnum.MESSAGE, {
+      data: { text: "hello", version: 1 },
+      status: "Success",
+    });
+
+    const secondUpdateHistory = store.history();
+
+    expect(store.history()).toBe(secondUpdateHistory);
+    expect(secondUpdateHistory[0]).toBe(firstUpdateHistory[0]);
+    expect(secondUpdateHistory[1]).toBe(firstUpdateHistory[1]);
+  });
+
+  it("keeps message signal references stable across unchanged reads and appends", () => {
+    expect(store.messages()).toBe(store.messages());
+
+    store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+
+    const firstMessages = store.messages();
+
+    expect(store.messages()).toBe(firstMessages);
+    expect(firstMessages).toHaveLength(1);
+
+    store.update(ReplayStoreEnum.MESSAGE, {
+      data: { text: "hello", version: 1 },
+      status: "Success",
+    });
+
+    const secondMessages = store.messages();
+
+    expect(store.messages()).toBe(secondMessages);
+    expect(secondMessages[0]).toBe(firstMessages[0]);
+  });
+
   it("drops future history when replaying an acknowledged message after time travel", () => {
     store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
     store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
@@ -350,6 +397,45 @@ describe("built-in store broker history", () => {
     secondStore.travelTo(0);
     expect(secondStore.replay(persistedRecordId!)).toBe(1);
     expect(secondStore.get(ReplayStoreEnum.COUNTER)().data).toBe(3);
+  });
+
+  it("refreshes message signal reads for shared storage-backed channels", () => {
+    const storage = new MemoryStorage();
+    const firstStore = new ReplayStore(
+      createStorageStoreMessageChannel<ReplayStoreData>({
+        storage,
+        storageKey: "shared-replay-store",
+      })
+    );
+    const secondStore = new ReplayStore(
+      createStorageStoreMessageChannel<ReplayStoreData>({
+        storage,
+        storageKey: "shared-replay-store",
+      })
+    );
+
+    expect(firstStore.messages()).toEqual([]);
+
+    secondStore.update(ReplayStoreEnum.COUNTER, {
+      data: 4,
+      status: "Success",
+    });
+
+    firstStore.travelTo(0);
+
+    const syncedMessages = firstStore.messages();
+
+    expect(syncedMessages).toHaveLength(1);
+    expect(firstStore.messages()).toBe(syncedMessages);
+    expect(syncedMessages[0]?.status).toBe("acknowledged");
+    expect(syncedMessages[0]?.message).toEqual({
+      type: "update",
+      key: ReplayStoreEnum.COUNTER,
+      state: {
+        data: 4,
+        status: "Success",
+      },
+    });
   });
 
   it("can fan out to multiple channels through a composite channel", () => {

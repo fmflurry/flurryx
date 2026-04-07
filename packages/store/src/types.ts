@@ -1,4 +1,6 @@
 import type { Signal } from "@angular/core";
+import type { StoreHistoryEntry } from "./store-replay";
+import type { StoreMessageRecord } from "./store-channels";
 import type {
   ResourceState,
   KeyedResourceData,
@@ -197,4 +199,13 @@ export interface IStore<TData extends StoreDataShape<TData>> {
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void
   ): () => void;
+
+  /** Reactive signal containing the full history entries. */
+  readonly history: Signal<readonly StoreHistoryEntry<TData>[]>;
+  /** Reactive signal containing all channel message records. */
+  readonly messages: Signal<readonly StoreMessageRecord<TData>[]>;
+  /** Reactive signal containing the current history index. */
+  readonly currentIndex: Signal<number>;
+  /** Reactive signal containing all registered store keys. */
+  readonly keys: Signal<readonly StoreKey<TData>[]>;
 }

@@ -246,6 +246,19 @@ interface StableReadonlyCollectionUpsertInput<
   readonly item: TItem;
 }
 
+interface StableReadonlyCollectionSyncInput<
+  TSource,
+  TItem extends {
+    readonly id: number;
+  }
+> {
+  readonly items: readonly TItem[];
+  readonly sourceItems: readonly TSource[];
+  readonly getSourceId: (item: TSource) => number;
+  readonly createItem: (item: TSource) => TItem;
+  readonly areEquivalent: (sourceItem: TSource, cachedItem: TItem) => boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -278,24 +291,198 @@ function toDeadLetterEntry<
   };
 }
 
+function areValuesEquivalent(
+  left: unknown,
+  right: unknown,
+  seen: WeakMap<object, WeakSet<object>> = new WeakMap<object, WeakSet<object>>()
+): boolean {
+  if (Object.is(left, right)) {
+    return true;
+  }
+
+  if (typeof left !== typeof right || left === null || right === null) {
+    return false;
+  }
+
+  if (typeof left !== "object" || typeof right !== "object") {
+    return false;
+  }
+
+  let seenRights = seen.get(left);
+  if (seenRights?.has(right)) {
+    return true;
+  }
+
+  if (!seenRights) {
+    seenRights = new WeakSet<object>();
+    seen.set(left, seenRights);
+  }
+  seenRights.add(right);
+
+  if (left instanceof Date || right instanceof Date) {
+    return (
+      left instanceof Date &&
+      right instanceof Date &&
+      left.getTime() === right.getTime()
+    );
+  }
+
+  if (left instanceof Map || right instanceof Map) {
+    if (!(left instanceof Map) || !(right instanceof Map)) {
+      return false;
+    }
+
+    const leftEntries = Array.from(left.entries());
+    const rightEntries = Array.from(right.entries());
+    if (leftEntries.length !== rightEntries.length) {
+      return false;
+    }
+
+    return leftEntries.every(([leftKey, leftValue], index) => {
+      const rightEntry = rightEntries[index];
+      if (!rightEntry) {
+        return false;
+      }
+
+      return (
+        areValuesEquivalent(leftKey, rightEntry[0], seen) &&
+        areValuesEquivalent(leftValue, rightEntry[1], seen)
+      );
+    });
+  }
+
+  if (left instanceof Set || right instanceof Set) {
+    if (!(left instanceof Set) || !(right instanceof Set)) {
+      return false;
+    }
+
+    const leftValues = Array.from(left.values());
+    const rightValues = Array.from(right.values());
+    if (leftValues.length !== rightValues.length) {
+      return false;
+    }
+
+    return leftValues.every((leftValue, index) =>
+      areValuesEquivalent(leftValue, rightValues[index], seen)
+    );
+  }
+
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right)) {
+      return false;
+    }
+
+    if (left.length !== right.length) {
+      return false;
+    }
+
+    return left.every((leftValue, index) =>
+      areValuesEquivalent(leftValue, right[index], seen)
+    );
+  }
+
+  if (Object.getPrototypeOf(left) !== Object.getPrototypeOf(right)) {
+    return false;
+  }
+
+  const leftRecord = left as Record<PropertyKey, unknown>;
+  const rightRecord = right as Record<PropertyKey, unknown>;
+  const leftKeys = Reflect.ownKeys(leftRecord);
+  const rightKeys = Reflect.ownKeys(rightRecord);
+
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+
+  return leftKeys.every((key) => {
+    if (!Object.prototype.hasOwnProperty.call(rightRecord, key)) {
+      return false;
+    }
+
+    return areValuesEquivalent(leftRecord[key], rightRecord[key], seen);
+  });
+}
+
+function areStoreMessageRecordsEquivalent<
+  TData extends StoreDataShape<TData>,
+  TKey extends StoreKey<TData>
+>(
+  sourceRecord: StoreMessageRecord<TData, TKey>,
+  cachedRecord: StoreMessageRecord<TData, TKey>
+): boolean {
+  return (
+    sourceRecord.id === cachedRecord.id &&
+    sourceRecord.status === cachedRecord.status &&
+    sourceRecord.attempts === cachedRecord.attempts &&
+    sourceRecord.createdAt === cachedRecord.createdAt &&
+    sourceRecord.lastAttemptedAt === cachedRecord.lastAttemptedAt &&
+    sourceRecord.acknowledgedAt === cachedRecord.acknowledgedAt &&
+    sourceRecord.error === cachedRecord.error &&
+    areValuesEquivalent(sourceRecord.message, cachedRecord.message)
+  );
+}
+
 function createStableReadonlyCollection<TItem>(
-  _items: readonly TItem[]
+  items: readonly TItem[]
 ): readonly TItem[] {
-  throw new Error("Not implemented");
+  return Object.freeze([...items]);
 }
 
 function appendStableReadonlyCollectionItem<TItem>(
-  _input: StableReadonlyCollectionAppendInput<TItem>
+  input: StableReadonlyCollectionAppendInput<TItem>
 ): readonly TItem[] {
-  throw new Error("Not implemented");
+  return createStableReadonlyCollection([...input.items, input.item]);
 }
 
 function upsertStableReadonlyCollectionItem<
   TItem extends {
     readonly id: number;
   }
->(_input: StableReadonlyCollectionUpsertInput<TItem>): readonly TItem[] {
-  throw new Error("Not implemented");
+>(input: StableReadonlyCollectionUpsertInput<TItem>): readonly TItem[] {
+  const existingIndex = input.items.findIndex(
+    (candidate) => candidate.id === input.item.id
+  );
+
+  if (existingIndex === -1) {
+    return appendStableReadonlyCollectionItem(input);
+  }
+
+  if (Object.is(input.items[existingIndex], input.item)) {
+    return input.items;
+  }
+
+  const nextItems = [...input.items];
+  nextItems[existingIndex] = input.item;
+  return createStableReadonlyCollection(nextItems);
+}
+
+function syncStableReadonlyCollectionById<
+  TSource,
+  TItem extends {
+    readonly id: number;
+  }
+>(input: StableReadonlyCollectionSyncInput<TSource, TItem>): readonly TItem[] {
+  const cachedItemsById = new Map<number, TItem>();
+  input.items.forEach((item) => {
+    cachedItemsById.set(item.id, item);
+  });
+
+  let didChange = input.items.length !== input.sourceItems.length;
+  const nextItems = input.sourceItems.map((sourceItem, index) => {
+    const cachedItem = cachedItemsById.get(input.getSourceId(sourceItem));
+    const nextItem =
+      cachedItem && input.areEquivalent(sourceItem, cachedItem)
+        ? cachedItem
+        : input.createItem(sourceItem);
+
+    if (!didChange && input.items[index] !== nextItem) {
+      didChange = true;
+    }
+
+    return nextItem;
+  });
+
+  return didChange ? createStableReadonlyCollection(nextItems) : input.items;
 }
 
 // ---------------------------------------------------------------------------
@@ -321,6 +508,12 @@ export function createStoreHistory<
     },
   ];
   let currentIndex = 0;
+  let historyCollection = createStableReadonlyCollection(
+    history.map((entry) => cloneValue(entry))
+  );
+  let messageCollection = createStableReadonlyCollection(
+    messageChannel.getMessages().map((record) => cloneValue(record))
+  );
 
   const version = signal(0);
   function notifyVersion(): void {
@@ -329,16 +522,19 @@ export function createStoreHistory<
 
   function recordSnapshot(record: StoreMessageRecord<TData, TKey>): void {
     const nextIndex = history.length;
-    history = [
-      ...history,
-      {
-        id: record.id,
-        index: nextIndex,
-        message: cloneValue(record.message),
-        snapshot: config.captureSnapshot(),
-        acknowledgedAt: record.acknowledgedAt,
-      },
-    ];
+    const nextHistoryEntry: StoreHistoryEntry<TData, TKey> = {
+      id: record.id,
+      index: nextIndex,
+      message: cloneValue(record.message),
+      snapshot: config.captureSnapshot(),
+      acknowledgedAt: record.acknowledgedAt,
+    };
+
+    history = [...history, nextHistoryEntry];
+    historyCollection = appendStableReadonlyCollectionItem({
+      items: historyCollection,
+      item: cloneValue(nextHistoryEntry),
+    });
     currentIndex = nextIndex;
   }
 
@@ -348,6 +544,9 @@ export function createStoreHistory<
     }
 
     history = history.slice(0, currentIndex + 1);
+    historyCollection = createStableReadonlyCollection(
+      historyCollection.slice(0, currentIndex + 1)
+    );
   }
 
   function ensureIndexInRange(index: number): void {
@@ -407,6 +606,10 @@ export function createStoreHistory<
     };
 
     messageChannel.saveMessage(nextRecord);
+    messageCollection = upsertStableReadonlyCollectionItem({
+      items: messageCollection,
+      item: cloneValue(nextRecord),
+    });
     return nextRecord;
   }
 
@@ -515,12 +718,19 @@ export function createStoreHistory<
 
   const historySignal = computed(() => {
     version();
-    return history.map((entry) => cloneValue(entry));
+    return historyCollection;
   });
 
   const messagesSignal = computed(() => {
     version();
-    return messageChannel.getMessages().map((record) => cloneValue(record));
+    messageCollection = syncStableReadonlyCollectionById({
+      items: messageCollection,
+      sourceItems: messageChannel.getMessages(),
+      getSourceId: (record) => record.id,
+      createItem: (record) => cloneValue(record),
+      areEquivalent: areStoreMessageRecordsEquivalent,
+    });
+    return messageCollection;
   });
 
   const currentIndexSignal = computed(() => {
@@ -534,6 +744,10 @@ export function createStoreHistory<
     currentIndexSignal,
     publish(message) {
       const record = messageChannel.publish(message);
+      messageCollection = appendStableReadonlyCollectionItem({
+        items: messageCollection,
+        item: cloneValue(record),
+      });
       return consumeRecord(record);
     },
     replay(input: number | readonly number[]) {

@@ -4,7 +4,7 @@ vi.mock("@angular/core", async () => {
   return import("../__mocks__/@angular/core");
 });
 
-import { LazyStore } from "../lazy-store";
+import { LazyStore, createInMemoryStoreMessageChannel } from "../index";
 import type { ResourceState, KeyedResourceData } from "@flurryx/core";
 
 interface TestEntity {
@@ -19,6 +19,21 @@ type TestData = {
 };
 
 describe("LazyStore", () => {
+  it("should expose public signal fields with lazy key registration", () => {
+    const store = new LazyStore<TestData>();
+
+    expect(store.history()).toHaveLength(1);
+    expect(store.messages()).toEqual([]);
+    expect(store.currentIndex()).toBe(0);
+    expect(store.keys()).toEqual([]);
+
+    store.get("items");
+    expect(store.keys()).toEqual(["items"]);
+
+    store.update("count", { data: 1, status: "Success" });
+    expect(store.keys()).toEqual(["items", "count"]);
+  });
+
   it("should lazily create signals with default state on first get()", () => {
     const store = new LazyStore<TestData>();
     const sig = store.get("items");
@@ -98,6 +113,66 @@ describe("LazyStore", () => {
     store.stopLoading("count");
 
     expect(store.get("count")().isLoading).toBe(false);
+  });
+
+  it("should update public history, messages, and currentIndex signals across updates and time travel", () => {
+    const store = new LazyStore<TestData>();
+
+    store.update("items", { data: ["a"], status: "Success" });
+    store.update("count", { data: 2, status: "Success" });
+
+    expect(store.history().map((entry) => entry.index)).toEqual([0, 1, 2]);
+    expect(store.messages().map((record) => record.status)).toEqual([
+      "acknowledged",
+      "acknowledged",
+    ]);
+    expect(store.currentIndex()).toBe(2);
+
+    store.travelTo(1);
+    expect(store.currentIndex()).toBe(1);
+    expect(store.get("items")().data).toEqual(["a"]);
+    expect(store.get("count")().data).toBeUndefined();
+
+    expect(store.undo()).toBe(true);
+    expect(store.currentIndex()).toBe(0);
+
+    expect(store.redo()).toBe(true);
+    expect(store.currentIndex()).toBe(1);
+    expect(store.get("items")().data).toEqual(["a"]);
+  });
+
+  it("should expose replay updates through public message and history signals", () => {
+    const store = new LazyStore<TestData>();
+
+    store.update("items", { data: ["a"], status: "Success" });
+    const messageId = store.messages()[0]?.id;
+
+    store.travelTo(0);
+
+    expect(store.replay(messageId!)).toBe(1);
+    expect(store.history()).toHaveLength(2);
+    expect(store.currentIndex()).toBe(1);
+    expect(store.messages()[0]?.status).toBe("acknowledged");
+    expect(store.get("items")().data).toEqual(["a"]);
+  });
+
+  it("should expose dead-letter replay through public message and history signals", () => {
+    const channel = createInMemoryStoreMessageChannel<TestData>();
+    const pendingClearAll = channel.publish({ type: "clearAll" });
+    const store = new LazyStore<TestData>({ channel });
+
+    expect(store.messages()[0]?.status).toBe("pending");
+    expect(store.replay(pendingClearAll.id)).toBe(0);
+    expect(store.messages()[0]?.status).toBe("dead-letter");
+    expect(store.history()).toHaveLength(1);
+    expect(store.currentIndex()).toBe(0);
+
+    store.get("items");
+
+    expect(store.replayDeadLetter(pendingClearAll.id)).toBe(true);
+    expect(store.messages()[0]?.status).toBe("acknowledged");
+    expect(store.history()).toHaveLength(2);
+    expect(store.currentIndex()).toBe(1);
   });
 
   it("should notify onUpdate callbacks when state changes", () => {

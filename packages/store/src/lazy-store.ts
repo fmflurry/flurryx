@@ -40,15 +40,17 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     WritableSignal<ResourceState<unknown>>
   >();
   private readonly hooks = new Map<string, UpdateCallback[]>();
-  private readonly history: StoreHistoryDriver<TData>;
+  private readonly historyDriver: StoreHistoryDriver<TData>;
 
-  readonly travelTo: StoreHistoryDriver<TData>["travelTo"];
-  readonly undo: StoreHistoryDriver<TData>["undo"];
-  readonly redo: StoreHistoryDriver<TData>["redo"];
-  readonly getDeadLetters: StoreHistoryDriver<TData>["getDeadLetters"];
-  readonly replayDeadLetter: StoreHistoryDriver<TData>["replayDeadLetter"];
-  readonly replayDeadLetters: StoreHistoryDriver<TData>["replayDeadLetters"];
-  readonly getCurrentIndex: StoreHistoryDriver<TData>["getCurrentIndex"];
+  /** @inheritDoc */
+  readonly travelTo = (index: number): void =>
+    this.historyDriver.travelTo(index);
+
+  /** @inheritDoc */
+  readonly undo = (): boolean => this.historyDriver.undo();
+
+  /** @inheritDoc */
+  readonly redo = (): boolean => this.historyDriver.redo();
 
   /** @inheritDoc */
   getMessages(): readonly StoreMessageRecord<TData>[];
@@ -60,11 +62,38 @@ export class LazyStore<TData extends StoreDataShape<TData>>
 
   getMessages<K extends StoreKey<TData>>(key?: K) {
     if (key === undefined) {
-      return this.history.getMessages();
+      return this.historyDriver.getMessages();
     }
 
-    return this.history.getMessages(key);
+    return this.historyDriver.getMessages(key);
   }
+
+  readonly getDeadLetters = () => this.historyDriver.getDeadLetters();
+
+  /** @inheritDoc */
+  readonly replayDeadLetter = (id: number): boolean =>
+    this.historyDriver.replayDeadLetter(id);
+
+  /** @inheritDoc */
+  readonly replayDeadLetters = (): number =>
+    this.historyDriver.replayDeadLetters();
+
+  /** @inheritDoc */
+  readonly getCurrentIndex = () => this.historyDriver.getCurrentIndex();
+
+  /** @inheritDoc */
+  readonly history!: Signal<readonly StoreHistoryEntry<TData>[]>;
+
+  /** @inheritDoc */
+  readonly messages!: Signal<readonly StoreMessageRecord<TData>[]>;
+
+  /** @inheritDoc */
+  readonly currentIndex!: Signal<number>;
+
+  /** @inheritDoc */
+  readonly keys!: Signal<readonly StoreKey<TData>[]>;
+
+  private readonly keysSignal = signal<readonly StoreKey<TData>[]>([]);
 
   /** @inheritDoc */
   replay(id: number): number;
@@ -74,10 +103,10 @@ export class LazyStore<TData extends StoreDataShape<TData>>
 
   replay(idOrIds: number | readonly number[]): number {
     if (Array.isArray(idOrIds)) {
-      return this.history.replay(idOrIds as readonly number[]);
+      return this.historyDriver.replay(idOrIds as readonly number[]);
     }
 
-    return this.history.replay(idOrIds as number);
+    return this.historyDriver.replay(idOrIds as number);
   }
 
   /** @inheritDoc */
@@ -90,10 +119,10 @@ export class LazyStore<TData extends StoreDataShape<TData>>
 
   getHistory<K extends StoreKey<TData>>(key?: K) {
     if (key === undefined) {
-      return this.history.getHistory();
+      return this.historyDriver.getHistory();
     }
 
-    return this.history.getHistory(key);
+    return this.historyDriver.getHistory(key);
   }
 
   constructor(options?: StoreOptions<TData>) {
@@ -112,20 +141,18 @@ export class LazyStore<TData extends StoreDataShape<TData>>
       }
     );
 
-    this.history = createStoreHistory<TData>({
+    this.historyDriver = createStoreHistory<TData>({
       captureSnapshot: () => consumer.createSnapshot(),
       applySnapshot: (snapshot) => consumer.applySnapshot(snapshot),
       applyMessage: (message) => consumer.applyMessage(message),
       channel: options?.channel,
     });
 
-    this.travelTo = (index) => this.history.travelTo(index);
-    this.undo = () => this.history.undo();
-    this.redo = () => this.history.redo();
-    this.getDeadLetters = () => this.history.getDeadLetters();
-    this.replayDeadLetter = (id) => this.history.replayDeadLetter(id);
-    this.replayDeadLetters = () => this.history.replayDeadLetters();
-    this.getCurrentIndex = () => this.history.getCurrentIndex();
+    const self = this as Record<string, unknown>;
+    self['history'] = this.historyDriver.historySignal;
+    self['messages'] = this.historyDriver.messagesSignal;
+    self['currentIndex'] = this.historyDriver.currentIndexSignal;
+    self['keys'] = this.keysSignal.asReadonly();
 
     trackStore(this);
   }
@@ -137,6 +164,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     if (!sig) {
       sig = signal<ResourceState<unknown>>(createDefaultState());
       this.signals.set(key, sig);
+      this.keysSignal.update((prev) => [...prev, key]);
     }
     return sig as WritableSignal<TData[K]>;
   }
@@ -148,29 +176,29 @@ export class LazyStore<TData extends StoreDataShape<TData>>
 
   /** @inheritDoc */
   update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void {
-    this.history.publish(
+    this.historyDriver.publish(
       createUpdateMessage<TData, K>(key, cloneValue(newState))
     );
   }
 
   /** @inheritDoc */
   clear<K extends StoreKey<TData>>(key: K): void {
-    this.history.publish(createClearMessage<TData, K>(key));
+    this.historyDriver.publish(createClearMessage<TData, K>(key));
   }
 
   /** @inheritDoc */
   clearAll(): void {
-    this.history.publish(createClearAllMessage<TData>());
+    this.historyDriver.publish(createClearAllMessage<TData>());
   }
 
   /** @inheritDoc */
   startLoading<K extends StoreKey<TData>>(key: K): void {
-    this.history.publish(createStartLoadingMessage<TData, K>(key));
+    this.historyDriver.publish(createStartLoadingMessage<TData, K>(key));
   }
 
   /** @inheritDoc */
   stopLoading<K extends StoreKey<TData>>(key: K): void {
-    this.history.publish(createStopLoadingMessage<TData, K>(key));
+    this.historyDriver.publish(createStopLoadingMessage<TData, K>(key));
   }
 
   /** @inheritDoc */
@@ -179,7 +207,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     resourceKey: KeyedResourceKey,
     entity: unknown
   ): void {
-    this.history.publish(
+    this.historyDriver.publish(
       createUpdateKeyedOneMessage<TData, K>(
         key,
         resourceKey,
@@ -193,7 +221,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
-    this.history.publish(
+    this.historyDriver.publish(
       createClearKeyedOneMessage<TData, K>(key, resourceKey)
     );
   }
@@ -203,7 +231,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
-    this.history.publish(
+    this.historyDriver.publish(
       createStartKeyedLoadingMessage<TData, K>(key, resourceKey)
     );
   }

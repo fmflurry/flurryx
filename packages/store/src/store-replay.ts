@@ -1,3 +1,4 @@
+import { signal, computed, type Signal } from "@angular/core";
 import type { StoreDataShape, StoreKey } from "./types";
 import type {
   StoreMessage,
@@ -204,6 +205,13 @@ export interface StoreHistory<
 
   /** Returns the currently restored history index used by snapshot navigation. */
   getCurrentIndex(): number;
+
+  /** Reactive signal containing the full history entries. */
+  readonly historySignal: Signal<readonly StoreHistoryEntry<TData, TKey>[]>;
+  /** Reactive signal containing all channel message records. */
+  readonly messagesSignal: Signal<readonly StoreMessageRecord<TData, TKey>[]>;
+  /** Reactive signal containing the current history index. */
+  readonly currentIndexSignal: Signal<number>;
 }
 
 export interface StoreHistoryDriver<
@@ -224,6 +232,20 @@ interface CreateStoreHistoryConfig<
   readonly clock?: () => number;
 }
 
+interface StableReadonlyCollectionAppendInput<TItem> {
+  readonly items: readonly TItem[];
+  readonly item: TItem;
+}
+
+interface StableReadonlyCollectionUpsertInput<
+  TItem extends {
+    readonly id: number;
+  }
+> {
+  readonly items: readonly TItem[];
+  readonly item: TItem;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -231,8 +253,11 @@ interface CreateStoreHistoryConfig<
 function messageAffectsKey<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData>,
-  K extends TKey,
->(message: StoreMessage<TData, TKey>, key: K): message is StoreMessage<TData, K> {
+  K extends TKey
+>(
+  message: StoreMessage<TData, TKey>,
+  key: K
+): message is StoreMessage<TData, K> {
   if (message.type === "clearAll") {
     return true;
   }
@@ -243,9 +268,7 @@ function messageAffectsKey<
 function toDeadLetterEntry<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData>
->(
-  record: StoreMessageRecord<TData, TKey>
-): StoreDeadLetterEntry<TData, TKey> {
+>(record: StoreMessageRecord<TData, TKey>): StoreDeadLetterEntry<TData, TKey> {
   return {
     id: record.id,
     message: cloneValue(record.message),
@@ -255,6 +278,26 @@ function toDeadLetterEntry<
   };
 }
 
+function createStableReadonlyCollection<TItem>(
+  _items: readonly TItem[]
+): readonly TItem[] {
+  throw new Error("Not implemented");
+}
+
+function appendStableReadonlyCollectionItem<TItem>(
+  _input: StableReadonlyCollectionAppendInput<TItem>
+): readonly TItem[] {
+  throw new Error("Not implemented");
+}
+
+function upsertStableReadonlyCollectionItem<
+  TItem extends {
+    readonly id: number;
+  }
+>(_input: StableReadonlyCollectionUpsertInput<TItem>): readonly TItem[] {
+  throw new Error("Not implemented");
+}
+
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
@@ -262,7 +305,9 @@ function toDeadLetterEntry<
 export function createStoreHistory<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>
->(config: CreateStoreHistoryConfig<TData, TKey>): StoreHistoryDriver<TData, TKey> {
+>(
+  config: CreateStoreHistoryConfig<TData, TKey>
+): StoreHistoryDriver<TData, TKey> {
   const messageChannel =
     config.channel ?? createInMemoryStoreMessageChannel<TData, TKey>();
   const clock = config.clock ?? Date.now;
@@ -276,6 +321,11 @@ export function createStoreHistory<
     },
   ];
   let currentIndex = 0;
+
+  const version = signal(0);
+  function notifyVersion(): void {
+    version.update((v) => v + 1);
+  }
 
   function recordSnapshot(record: StoreMessageRecord<TData, TKey>): void {
     const nextIndex = history.length;
@@ -310,6 +360,7 @@ export function createStoreHistory<
     ensureIndexInRange(index);
     config.applySnapshot(history[index]!.snapshot);
     currentIndex = index;
+    notifyVersion();
   }
 
   function undo(): boolean {
@@ -350,7 +401,8 @@ export function createStoreHistory<
       status,
       attempts: record.attempts + 1,
       lastAttemptedAt: attemptedAt,
-      acknowledgedAt: status === "acknowledged" ? attemptedAt : record.acknowledgedAt,
+      acknowledgedAt:
+        status === "acknowledged" ? attemptedAt : record.acknowledgedAt,
       error,
     };
 
@@ -388,6 +440,7 @@ export function createStoreHistory<
         recordSnapshot(acknowledgedRecord);
       }
 
+      notifyVersion();
       return true;
     } catch (error) {
       persistMessageAttempt(
@@ -399,6 +452,7 @@ export function createStoreHistory<
         getErrorMessage(error),
         attemptedAt
       );
+      notifyVersion();
       return false;
     }
   }
@@ -459,7 +513,25 @@ export function createStoreHistory<
     return acknowledgedCount;
   }
 
+  const historySignal = computed(() => {
+    version();
+    return history.map((entry) => cloneValue(entry));
+  });
+
+  const messagesSignal = computed(() => {
+    version();
+    return messageChannel.getMessages().map((record) => cloneValue(record));
+  });
+
+  const currentIndexSignal = computed(() => {
+    version();
+    return currentIndex;
+  });
+
   return {
+    historySignal,
+    messagesSignal,
+    currentIndexSignal,
     publish(message) {
       const record = messageChannel.publish(message);
       return consumeRecord(record);

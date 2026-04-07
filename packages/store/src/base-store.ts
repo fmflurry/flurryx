@@ -85,16 +85,16 @@ export abstract class BaseStore<
   readonly getCurrentIndex = () => this.historyDriver.getCurrentIndex();
 
   /** @inheritDoc */
-  readonly history!: Signal<readonly StoreHistoryEntry<TData>[]>;
+  readonly history: Signal<readonly StoreHistoryEntry<TData>[]>;
 
   /** @inheritDoc */
-  readonly messages!: Signal<readonly StoreMessageRecord<TData>[]>;
+  readonly messages: Signal<readonly StoreMessageRecord<TData>[]>;
 
   /** @inheritDoc */
-  readonly currentIndex!: Signal<number>;
+  readonly currentIndex: Signal<number>;
 
   /** @inheritDoc */
-  readonly keys!: Signal<readonly StoreKey<TData>[]>;
+  readonly keys: Signal<readonly StoreKey<TData>[]>;
 
   /** @inheritDoc */
   replay(id: number): number;
@@ -172,11 +172,10 @@ export abstract class BaseStore<
       channel: options?.channel,
     });
 
-    const self = this as Record<string, unknown>;
-    self['history'] = this.historyDriver.historySignal;
-    self['messages'] = this.historyDriver.messagesSignal;
-    self['currentIndex'] = this.historyDriver.currentIndexSignal;
-    self['keys'] = signal([...this.storeKeys]).asReadonly();
+    this.history = this.historyDriver.historySignal;
+    this.messages = this.historyDriver.messagesSignal;
+    this.currentIndex = this.historyDriver.currentIndexSignal;
+    this.keys = signal([...this.storeKeys]).asReadonly();
 
     trackStore(this);
   }

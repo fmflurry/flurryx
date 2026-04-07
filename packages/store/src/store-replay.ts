@@ -232,20 +232,6 @@ interface CreateStoreHistoryConfig<
   readonly clock?: () => number;
 }
 
-interface StableReadonlyCollectionAppendInput<TItem> {
-  readonly items: readonly TItem[];
-  readonly item: TItem;
-}
-
-interface StableReadonlyCollectionUpsertInput<
-  TItem extends {
-    readonly id: number;
-  }
-> {
-  readonly items: readonly TItem[];
-  readonly item: TItem;
-}
-
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -276,26 +262,6 @@ function toDeadLetterEntry<
     error: record.error ?? MESSAGE_NOT_ACKNOWLEDGED_ERROR,
     failedAt: record.lastAttemptedAt ?? record.createdAt,
   };
-}
-
-function createStableReadonlyCollection<TItem>(
-  _items: readonly TItem[]
-): readonly TItem[] {
-  throw new Error("Not implemented");
-}
-
-function appendStableReadonlyCollectionItem<TItem>(
-  _input: StableReadonlyCollectionAppendInput<TItem>
-): readonly TItem[] {
-  throw new Error("Not implemented");
-}
-
-function upsertStableReadonlyCollectionItem<
-  TItem extends {
-    readonly id: number;
-  }
->(_input: StableReadonlyCollectionUpsertInput<TItem>): readonly TItem[] {
-  throw new Error("Not implemented");
 }
 
 // ---------------------------------------------------------------------------

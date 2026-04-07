@@ -42,14 +42,13 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   private readonly hooks = new Map<string, UpdateCallback[]>();
   private readonly history: StoreHistoryDriver<TData>;
 
-  /** @inheritDoc */
-  readonly travelTo = (index: number): void => this.history.travelTo(index);
-
-  /** @inheritDoc */
-  readonly undo = (): boolean => this.history.undo();
-
-  /** @inheritDoc */
-  readonly redo = (): boolean => this.history.redo();
+  readonly travelTo: StoreHistoryDriver<TData>["travelTo"];
+  readonly undo: StoreHistoryDriver<TData>["undo"];
+  readonly redo: StoreHistoryDriver<TData>["redo"];
+  readonly getDeadLetters: StoreHistoryDriver<TData>["getDeadLetters"];
+  readonly replayDeadLetter: StoreHistoryDriver<TData>["replayDeadLetter"];
+  readonly replayDeadLetters: StoreHistoryDriver<TData>["replayDeadLetters"];
+  readonly getCurrentIndex: StoreHistoryDriver<TData>["getCurrentIndex"];
 
   /** @inheritDoc */
   getMessages(): readonly StoreMessageRecord<TData>[];
@@ -66,19 +65,6 @@ export class LazyStore<TData extends StoreDataShape<TData>>
 
     return this.history.getMessages(key);
   }
-
-  /** @inheritDoc */
-  readonly getDeadLetters = () => this.history.getDeadLetters();
-
-  /** @inheritDoc */
-  readonly replayDeadLetter = (id: number): boolean =>
-    this.history.replayDeadLetter(id);
-
-  /** @inheritDoc */
-  readonly replayDeadLetters = (): number => this.history.replayDeadLetters();
-
-  /** @inheritDoc */
-  readonly getCurrentIndex = () => this.history.getCurrentIndex();
 
   /** @inheritDoc */
   replay(id: number): number;
@@ -132,6 +118,14 @@ export class LazyStore<TData extends StoreDataShape<TData>>
       applyMessage: (message) => consumer.applyMessage(message),
       channel: options?.channel,
     });
+
+    this.travelTo = (index) => this.history.travelTo(index);
+    this.undo = () => this.history.undo();
+    this.redo = () => this.history.redo();
+    this.getDeadLetters = () => this.history.getDeadLetters();
+    this.replayDeadLetter = (id) => this.history.replayDeadLetter(id);
+    this.replayDeadLetters = () => this.history.replayDeadLetters();
+    this.getCurrentIndex = () => this.history.getCurrentIndex();
 
     trackStore(this);
   }

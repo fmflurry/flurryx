@@ -58,29 +58,43 @@ export abstract class BaseStore<
     WritableSignal<ResourceState<unknown>>
   >();
   private readonly storeKeys: readonly StoreKey<TData>[];
-  private readonly history: StoreHistoryDriver<TData>;
+  private readonly historyDriver: StoreHistoryDriver<TData>;
 
   /** @inheritDoc */
-  readonly travelTo = (index: number): void => this.history.travelTo(index);
+  readonly travelTo = (index: number): void =>
+    this.historyDriver.travelTo(index);
 
   /** @inheritDoc */
-  readonly undo = (): boolean => this.history.undo();
+  readonly undo = (): boolean => this.historyDriver.undo();
 
   /** @inheritDoc */
-  readonly redo = (): boolean => this.history.redo();
+  readonly redo = (): boolean => this.historyDriver.redo();
 
   /** @inheritDoc */
-  readonly getDeadLetters = () => this.history.getDeadLetters();
+  readonly getDeadLetters = () => this.historyDriver.getDeadLetters();
 
   /** @inheritDoc */
   readonly replayDeadLetter = (id: number): boolean =>
-    this.history.replayDeadLetter(id);
+    this.historyDriver.replayDeadLetter(id);
 
   /** @inheritDoc */
-  readonly replayDeadLetters = (): number => this.history.replayDeadLetters();
+  readonly replayDeadLetters = (): number =>
+    this.historyDriver.replayDeadLetters();
 
   /** @inheritDoc */
-  readonly getCurrentIndex = () => this.history.getCurrentIndex();
+  readonly getCurrentIndex = () => this.historyDriver.getCurrentIndex();
+
+  /** @inheritDoc */
+  readonly history!: Signal<readonly StoreHistoryEntry<TData>[]>;
+
+  /** @inheritDoc */
+  readonly messages!: Signal<readonly StoreMessageRecord<TData>[]>;
+
+  /** @inheritDoc */
+  readonly currentIndex!: Signal<number>;
+
+  /** @inheritDoc */
+  readonly keys!: Signal<readonly StoreKey<TData>[]>;
 
   /** @inheritDoc */
   replay(id: number): number;
@@ -90,10 +104,10 @@ export abstract class BaseStore<
 
   replay(idOrIds: number | readonly number[]): number {
     if (Array.isArray(idOrIds)) {
-      return this.history.replay(idOrIds as readonly number[]);
+      return this.historyDriver.replay(idOrIds as readonly number[]);
     }
 
-    return this.history.replay(idOrIds as number);
+    return this.historyDriver.replay(idOrIds as number);
   }
 
   /** @inheritDoc */
@@ -106,10 +120,10 @@ export abstract class BaseStore<
 
   getHistory<K extends StoreKey<TData>>(key?: K) {
     if (key === undefined) {
-      return this.history.getHistory();
+      return this.historyDriver.getHistory();
     }
 
-    return this.history.getHistory(key);
+    return this.historyDriver.getHistory(key);
   }
 
   /** @inheritDoc */
@@ -122,10 +136,10 @@ export abstract class BaseStore<
 
   getMessages<K extends StoreKey<TData>>(key?: K) {
     if (key === undefined) {
-      return this.history.getMessages();
+      return this.historyDriver.getMessages();
     }
 
-    return this.history.getMessages(key);
+    return this.historyDriver.getMessages(key);
   }
 
   protected constructor(
@@ -151,12 +165,18 @@ export abstract class BaseStore<
       }
     );
 
-    this.history = createStoreHistory<TData>({
+    this.historyDriver = createStoreHistory<TData>({
       captureSnapshot: () => consumer.createSnapshot(),
       applySnapshot: (snapshot) => consumer.applySnapshot(snapshot),
       applyMessage: (message) => consumer.applyMessage(message),
       channel: options?.channel,
     });
+
+    const self = this as Record<string, unknown>;
+    self['history'] = this.historyDriver.historySignal;
+    self['messages'] = this.historyDriver.messagesSignal;
+    self['currentIndex'] = this.historyDriver.currentIndexSignal;
+    self['keys'] = signal([...this.storeKeys]).asReadonly();
 
     trackStore(this);
   }
@@ -219,14 +239,14 @@ export abstract class BaseStore<
    * @param newState - Partial state to merge (e.g. `{ data: newData, status: 'Success' }`).
    */
   update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void {
-    this.history.publish(
+    this.historyDriver.publish(
       createUpdateMessage<TData, K>(key, cloneValue(newState))
     );
   }
 
   /** Resets every slot in this store to its initial idle state. */
   clearAll(): void {
-    this.history.publish(createClearAllMessage<TData>());
+    this.historyDriver.publish(createClearAllMessage<TData>());
   }
 
   /**
@@ -235,7 +255,7 @@ export abstract class BaseStore<
    * @param key - The slot to clear.
    */
   clear<K extends StoreKey<TData>>(key: K): void {
-    this.history.publish(createClearMessage<TData, K>(key));
+    this.historyDriver.publish(createClearMessage<TData, K>(key));
   }
 
   /**
@@ -244,7 +264,7 @@ export abstract class BaseStore<
    * @param key - The slot to mark as loading.
    */
   startLoading<K extends StoreKey<TData>>(key: K): void {
-    this.history.publish(createStartLoadingMessage<TData, K>(key));
+    this.historyDriver.publish(createStartLoadingMessage<TData, K>(key));
   }
 
   /**
@@ -254,7 +274,7 @@ export abstract class BaseStore<
    * @param key - The slot to stop loading.
    */
   stopLoading<K extends StoreKey<TData>>(key: K): void {
-    this.history.publish(createStopLoadingMessage<TData, K>(key));
+    this.historyDriver.publish(createStopLoadingMessage<TData, K>(key));
   }
 
   /**
@@ -271,7 +291,7 @@ export abstract class BaseStore<
     resourceKey: KeyedResourceKey,
     entity: unknown
   ): void {
-    this.history.publish(
+    this.historyDriver.publish(
       createUpdateKeyedOneMessage<TData, K>(
         key,
         resourceKey,
@@ -292,7 +312,7 @@ export abstract class BaseStore<
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
-    this.history.publish(
+    this.historyDriver.publish(
       createClearKeyedOneMessage<TData, K>(key, resourceKey)
     );
   }
@@ -309,7 +329,7 @@ export abstract class BaseStore<
     key: K,
     resourceKey: KeyedResourceKey
   ): void {
-    this.history.publish(
+    this.historyDriver.publish(
       createStartKeyedLoadingMessage<TData, K>(key, resourceKey)
     );
   }

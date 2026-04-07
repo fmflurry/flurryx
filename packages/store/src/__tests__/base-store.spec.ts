@@ -4,7 +4,7 @@ vi.mock("@angular/core", async () => {
   return import("../__mocks__/@angular/core");
 });
 
-import { BaseStore } from "../base-store";
+import { BaseStore, createInMemoryStoreMessageChannel } from "../index";
 import type { ResourceState, KeyedResourceData } from "@flurryx/core";
 
 enum TestStoreEnum {
@@ -22,6 +22,12 @@ interface TestData {
 class TestStore extends BaseStore<typeof TestStoreEnum, TestData> {
   constructor() {
     super(TestStoreEnum);
+  }
+}
+
+class TestStoreWithChannel extends BaseStore<typeof TestStoreEnum, TestData> {
+  constructor(channel: ReturnType<typeof createInMemoryStoreMessageChannel<TestData>>) {
+    super(TestStoreEnum, { channel });
   }
 }
 
@@ -47,6 +53,74 @@ describe("BaseStore", () => {
         expect(state.status).toBeUndefined();
         expect(state.errors).toBeUndefined();
       });
+    });
+
+    it("should expose public signal fields for history, messages, currentIndex, and keys", () => {
+      expect(store.history()).toHaveLength(1);
+      expect(store.messages()).toEqual([]);
+      expect(store.currentIndex()).toBe(0);
+      expect(store.keys()).toEqual(Object.values(TestStoreEnum));
+    });
+  });
+
+  describe("public signal contract", () => {
+    it("should update history, messages, and currentIndex signals across updates and time travel", () => {
+      store.update(TestStoreEnum.ITEM_ONE, { data: "one", status: "Success" });
+      store.update(TestStoreEnum.ITEM_TWO, { data: 2, status: "Success" });
+
+      expect(store.history().map((entry) => entry.index)).toEqual([0, 1, 2]);
+      expect(store.messages().map((record) => record.status)).toEqual([
+        "acknowledged",
+        "acknowledged",
+      ]);
+      expect(store.currentIndex()).toBe(2);
+
+      store.travelTo(1);
+      expect(store.currentIndex()).toBe(1);
+      expect(store.get(TestStoreEnum.ITEM_ONE)().data).toBe("one");
+      expect(store.get(TestStoreEnum.ITEM_TWO)().data).toBeUndefined();
+
+      expect(store.undo()).toBe(true);
+      expect(store.currentIndex()).toBe(0);
+      expect(store.get(TestStoreEnum.ITEM_ONE)().data).toBeUndefined();
+
+      expect(store.redo()).toBe(true);
+      expect(store.currentIndex()).toBe(1);
+      expect(store.get(TestStoreEnum.ITEM_ONE)().data).toBe("one");
+    });
+
+    it("should expose replay updates through public message and history signals", () => {
+      store.update(TestStoreEnum.ITEM_ONE, { data: "one", status: "Success" });
+      const messageId = store.messages()[0]?.id;
+
+      store.travelTo(0);
+
+      expect(store.replay(messageId!)).toBe(1);
+      expect(store.history()).toHaveLength(2);
+      expect(store.currentIndex()).toBe(1);
+      expect(store.messages()[0]?.status).toBe("acknowledged");
+      expect(store.get(TestStoreEnum.ITEM_ONE)().data).toBe("one");
+    });
+
+    it("should expose failed dead-letter replay attempts through public message and history signals", () => {
+      const channel = createInMemoryStoreMessageChannel<TestData>();
+      const pendingInvalidClear = channel.publish({
+        type: "clear",
+        key: "INVALID" as TestStoreEnum,
+      });
+      const failingStore = new TestStoreWithChannel(channel);
+
+      expect(failingStore.messages()[0]?.status).toBe("pending");
+      expect(failingStore.replay(pendingInvalidClear.id)).toBe(0);
+      expect(failingStore.messages()[0]?.status).toBe("dead-letter");
+      expect(failingStore.history()).toHaveLength(1);
+      expect(failingStore.currentIndex()).toBe(0);
+
+      expect(failingStore.replayDeadLetter(pendingInvalidClear.id)).toBe(false);
+      expect(failingStore.messages()[0]?.status).toBe("dead-letter");
+      expect(failingStore.messages()[0]?.attempts).toBe(2);
+      expect(failingStore.history()).toHaveLength(1);
+      expect(failingStore.currentIndex()).toBe(0);
     });
   });
 

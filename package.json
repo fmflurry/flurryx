@@ -8,7 +8,8 @@
     "build": "npm run build -w packages/core && npm run build -w packages/store && npm run build -w packages/rx && npm run build -w packages/flurryx",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=clover --coverage.reporter=text",
+    "test:coverage": "vitest run --config packages/core/vitest.config.ts --coverage && vitest run --config packages/store/vitest.config.ts --coverage && vitest run --config packages/rx/vitest.config.ts --coverage && vitest run --config packages/flurryx/vitest.config.ts --coverage",
+    "test:coverage:workspace": "vitest run --coverage --coverage.reporter=lcov --coverage.reporter=clover --coverage.reporter=text",
     "typecheck": "npm run typecheck --workspaces",
     "changeset": "changeset",
     "release": "npm run build && changeset publish"

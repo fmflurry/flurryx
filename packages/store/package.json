@@ -1,6 +1,6 @@
 {
   "name": "@flurryx/store",
-  "version": "0.8.4",
+  "version": "1.0.0",
   "description": "Signal-first reactive store for Angular",
   "license": "MIT",
   "type": "module",
@@ -28,7 +28,7 @@
   },
   "sideEffects": false,
   "dependencies": {
-    "@flurryx/core": "0.8.4"
+    "@flurryx/core": "1.0.0"
   },
   "peerDependencies": {
     "@angular/core": ">=17.0.0"

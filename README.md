@@ -47,93 +47,138 @@
 
 flurryx bridges the gap between RxJS async operations and Angular signals. Define a store, pipe your HTTP calls through an operator, read signals in your templates, queue store messages when you need to batch updates, and replay history when you need deterministic state transitions. No actions, no reducers, no effects boilerplate.
 
-## Feature Summary
+## What It Looks Like
 
-| Capability | What flurryx gives you |
-| ---------- | ---------------------- |
-| Typed signal stores | Slot-based stores built from TypeScript types, with readonly `Signal<ResourceState<T>>` reads |
-| RxJS to signal bridge | `syncToStore` and `syncToKeyedStore` wire HTTP calls and streams straight into store lifecycle updates |
-| Loading and error state | Consistent `isLoading`, `status`, and normalized `errors` for every slot |
-| Cache-aware fetch flows | `@SkipIfCached` and `@Loading` handle deduplication, cache TTL, and loading flags close to the facade method |
-| Keyed entity caches | `KeyedResourceData` tracks loading, status, and errors per entity ID |
-| Invalidation helpers | `clear`, `clearAll`, `clearAllStores`, and `clearKeyedOne` cover slot-level and app-wide resets |
-| Store composition | Mirror state across stores with `.mirror()`, `.mirrorSelf()`, `.mirrorKeyed()`, `mirrorKey`, and `collectKeyed` |
-| Message queueing and history | `createStoreReplayController` queues typed store messages, records snapshots, and supports replay, undo, redo, and time travel |
-| Lean package surface | Use the umbrella `flurryx` package or the focused `@flurryx/core`, `@flurryx/store`, and `@flurryx/rx` packages |
-
-## Quick Example
-
-This is what using flurryx looks like in a typical Angular feature: define a store, expose it through a facade, then bind the resulting signals in a component.
+Define a store. Inject it. Read signals. That's it.
 
 ```typescript
-import { Component, Injectable, inject } from "@angular/core";
-import { HttpClient } from "@angular/common/http";
-import { Loading, SkipIfCached, Store, syncToStore } from "flurryx";
+import { Store } from "flurryx";
 
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-}
-
-// Store — declare your slots with a single interface
 interface ProductStoreConfig {
   LIST: Product[];
   DETAIL: Product;
 }
+
 export const ProductStore = Store.for<ProductStoreConfig>().build();
+```
 
-// Facade
-@Injectable({ providedIn: "root" })
-export class ProductFacade {
-  private readonly http = inject(HttpClient);
-  readonly store = inject(ProductStore);
+One interface, one line — you get a fully typed, injectable store with loading state, error tracking, and history built in.
 
-  @SkipIfCached("LIST", (instance: ProductFacade) => instance.store)
-  @Loading("LIST", (instance: ProductFacade) => instance.store)
-  loadProducts() {
-    this.http
-      .get<Product[]>("/api/products")
-      .pipe(syncToStore(this.store, "LIST"))
-      .subscribe();
-  }
-
-  // Read signals from the facade
-  getProducts() {
-    return this.store.get("LIST");
-  }
-}
-
-// Component — read the facade signal once, use it in the template
+```typescript
 @Component({
-  selector: "app-product-list",
   template: `
-    @if (productsState().isLoading) {
-    <spinner />
-    } @for (product of productsState().data; track product.id) {
-    <product-card [product]="product" />
+    @if (state().isLoading) { <spinner /> }
+    @if (state().status === 'Error') { <error-banner [errors]="state().errors" /> }
+    @for (product of state().data; track product.id) {
+      <product-card [product]="product" />
     }
   `,
 })
 export class ProductListComponent {
-  private readonly facade = inject(ProductFacade);
-  readonly productsState = this.facade.getProducts();
-
-  constructor() {
-    this.facade.loadProducts();
-  }
+  private readonly store = inject(ProductStore);
+  readonly state = this.store.get("LIST");
 }
 ```
 
-No `async` pipe. No `subscribe` in templates. No manual unsubscription.
+No `async` pipe. No `subscribe`. No manual unsubscription. `isLoading`, `status`, and `errors` are always there — you just read them.
+
+**Need HTTP?** Pipe it straight into the store:
+
+```typescript
+this.http
+  .get<Product[]>("/api/products")
+  .pipe(syncToStore(this.store, "LIST"))
+  .subscribe();
+```
+
+**Need caching?** Add a decorator — the method is skipped when data is fresh:
+
+```typescript
+@SkipIfCached("LIST", (i: ProductFacade) => i.store)
+@Loading("LIST", (i: ProductFacade) => i.store)
+loadProducts() { /* only runs on cache miss */ }
+```
+
+**Need undo/redo?** It's already there:
+
+```typescript
+store.undo();
+store.redo();
+store.travelTo(0); // back to initial state
+```
+
+The store is the foundation. Layer on facades, decorators, mirroring, and message channels when your app needs them — not before.
+
+---
+
+## Why flurryx?
+
+Angular signals are great for synchronous reactivity, but real applications still need RxJS for HTTP calls, WebSockets, and other async sources. The space between "I fired a request" and "my template shows the result" is where complexity piles up:
+
+| Problem | Without flurryx | With flurryx |
+| --- | --- | --- |
+| Loading spinners | Manual boolean flags, race conditions | `store.get(key)().isLoading` |
+| Error handling | Scattered `catchError`, inconsistent shapes | Normalized `{ code, message }[]` on every slot |
+| Caching | Custom `shareReplay` / `BehaviorSubject` | `@SkipIfCached` — one decorator |
+| Duplicate requests | Manual inflight tracking | `@SkipIfCached` deduplicates while loading |
+| Keyed resources | Separate state per ID, boilerplate explosion | `KeyedResourceData` with per-key loading/error |
+| Replay and history | Ad hoc logging, custom devtools | Built-in message log, undo, redo, replay by id |
+
+flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cache/loading decorators, store composition helpers, and a message broker with pluggable channels.
+
+---
+
+## Feature Summary
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### Store & Signals
+- **Typed signal stores** — interface in, signals out
+- **Loading & error lifecycle** — automatic on every slot
+- **Keyed entity caches** — per-entity loading, status, errors
+- **Cache invalidation** — slot, store, or app-wide
+
+</td>
+<td width="50%" valign="top">
+
+### RxJS Bridge
+- **syncToStore** — pipe HTTP calls into the store
+- **@SkipIfCached** — skip when data is fresh
+- **@Loading** — auto-set loading flags
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+
+### Message Broker
+- **Message queueing** — typed, immutable, traceable
+- **History & time travel** — undo, redo, travelTo
+- **Replay** — re-execute messages by id
+- **Dead-letter recovery** — retry failed mutations
+- **Pluggable channels** — memory, localStorage, sessionStorage, composite
+- **Serialization** — Date, Map, Set round-trip through storage
+
+</td>
+<td width="50%" valign="top">
+
+### Store Composition
+- **Mirroring** — `.mirror()`, `.mirrorSelf()`, `.mirrorKeyed()`
+- **mirrorKey / collectKeyed** — imperative wiring with cleanup
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## Table of Contents
 
-- [Feature Summary](#feature-summary)
-- [Quick Example](#quick-example)
+- [What It Looks Like](#what-it-looks-like)
 - [Why flurryx?](#why-flurryx)
+- [Feature Summary](#feature-summary)
 - [Packages](#packages)
 - [How to Install](#how-to-install)
 - [Getting Started](#getting-started)
@@ -150,6 +195,14 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
 - [Keyed Resources](#keyed-resources)
 - [Clearing Store Data](#clearing-store-data)
 - [Message Queueing and History](#message-queueing-and-history)
+  - [Message Lifecycle](#message-lifecycle)
+  - [Message Types](#message-types)
+  - [History and Time Travel](#history-and-time-travel)
+  - [Message Replay](#message-replay)
+  - [Dead-Letter Recovery](#dead-letter-recovery)
+- [Message Channels](#message-channels)
+  - [Channel Types](#channel-types)
+  - [Built-in Serialization](#built-in-serialization)
 - [Store Mirroring](#store-mirroring)
   - [Builder .mirror()](#builder-mirror)
   - [Builder .mirrorSelf()](#builder-mirrorself)
@@ -159,23 +212,6 @@ No `async` pipe. No `subscribe` in templates. No manual unsubscription.
 - [Design Decisions](#design-decisions)
 - [Contributing](#contributing)
 - [License](#license)
-
----
-
-## Why flurryx?
-
-Angular signals are great for synchronous reactivity, but real applications still need RxJS for HTTP calls, WebSockets, and other async sources. The space between "I fired a request" and "my template shows the result" is where complexity piles up:
-
-| Problem            | Without flurryx                                    | With flurryx                                   |
-| ------------------ | -------------------------------------------------- | ---------------------------------------------- |
-| Loading spinners   | Manual boolean flags, race conditions              | `store.get(key)().isLoading`                   |
-| Error handling     | Scattered `catchError` blocks, inconsistent shapes | Normalized `{ code, message }[]` on every slot |
-| Caching            | Custom `shareReplay` / `BehaviorSubject` wiring    | `@SkipIfCached` decorator, one line            |
-| Duplicate requests | Manual `distinctUntilChanged`, inflight tracking   | `@SkipIfCached` deduplicates while loading     |
-| Keyed resources    | Separate state per ID, boilerplate explosion       | `KeyedResourceData` with per-key loading/error |
-| Replay and history | Ad hoc logging, custom devtools plumbing           | Queue store messages, flush snapshots, undo, redo, and replay deterministically |
-
-flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cache/loading decorators, store composition helpers, and a replay controller.
 
 ---
 
@@ -782,56 +818,247 @@ export class InvoiceFacade {
 
 ## Message Queueing and History
 
-When you need deterministic store updates, local event sourcing, or time-travel style debugging, flurryx exposes `createStoreReplayController`.
+Every store mutation in flurryx is a **typed message** published to an internal broker channel. The broker is not a traditional async message queue — consumption is **synchronous** within the same JavaScript call stack. This means there are no race conditions, no ordering ambiguity, and no worker threads. The channel acts as a **transactional log** that enables message introspection, replay, undo/redo, and dead-letter recovery.
 
-It lets you queue typed store messages, flush them in order, record snapshots after each committed message, and move backward or forward through history.
+### Message Lifecycle
 
-```typescript
-import { createStoreReplayController } from "flurryx";
-
-const controller = createStoreReplayController({
-  store,
-  keys: ["MESSAGES", "ACTIVE_THREAD"] as const,
-});
-
-controller.enqueue({
-  type: "startLoading",
-  key: "MESSAGES",
-});
-
-controller.enqueue({
-  type: "update",
-  key: "MESSAGES",
-  state: {
-    data: [{ id: "m-1", text: "hello" }],
-    status: "Success",
-  },
-});
-
-controller.flush();
-controller.undo();
-controller.redo();
-controller.travelTo(0);
-controller.replay();
+```
+store.update('CUSTOMERS', { data: [...], status: 'Success' })
+  │
+  ▼
+┌─────────────────────────────┐
+│  Create typed StoreMessage  │   { type: 'update', key: 'CUSTOMERS', state: { ... } }
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│  Publish to channel         │   Assigns stable numeric id, status = 'pending'
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│  Consume (apply to signal)  │   Angular Signal updated, onUpdate hooks fired
+└──────────┬──────────┬───────┘
+           │          │
+       success      failure
+           │          │
+           ▼          ▼
+    ┌────────────┐  ┌──────────────┐
+    │ Acknowledged│  │ Dead-letter  │   Tracked with error + attempt count
+    └──────┬─────┘  └──────────────┘
+           ▼
+    ┌────────────┐
+    │  Snapshot   │   Full store state captured for history
+    └────────────┘
 ```
 
-**What it supports:**
+All of this happens **synchronously** in a single call. When `store.update()` returns, the message is already acknowledged, the signal is updated, and the snapshot is recorded.
 
-- Queueing updates before they touch the live store with `enqueue()`
-- Committing queued messages in order with `flush()`
-- Replaying committed history from the initial snapshot with `replay()`
-- Time travel with `travelTo(index)`, `undo()`, and `redo()`
-- Typed messages for `update`, `clear`, `clearAll`, `startLoading`, `stopLoading`, `updateKeyedOne`, `clearKeyedOne`, and `startKeyedLoading`
-- Safe snapshot cloning for rich objects such as `Date`, `Map`, `Set`, arrays, and nested objects
+### Message Types
 
-**Why it matters:**
+Every store method produces one of these typed messages:
 
-- Batch multiple store mutations behind a single orchestration point
-- Reproduce tricky UI state transitions without ad hoc logging
-- Build debugging tools, dev panels, or optimistic flows on top of a consistent message stream
-- Model chat, queue-driven workflows, or audit-friendly state transitions with explicit history
+| Message type | Produced by | Payload |
+|---|---|---|
+| `update` | `update(key, partial)` | `key`, `state` (partial merge) |
+| `clear` | `clear(key)` | `key` |
+| `clearAll` | `clearAll()` | _(none — affects all slots)_ |
+| `startLoading` | `startLoading(key)` | `key` |
+| `stopLoading` | `stopLoading(key)` | `key` |
+| `updateKeyedOne` | `updateKeyedOne(key, rk, entity)` | `key`, `resourceKey`, `entity` |
+| `clearKeyedOne` | `clearKeyedOne(key, rk)` | `key`, `resourceKey` |
+| `startKeyedLoading` | `startKeyedLoading(key, rk)` | `key`, `resourceKey` |
 
-The replay controller only tracks the keys you register, so you can scope history to a single feature store or a narrow slice of state.
+Messages are immutable and deep-cloned on publish to prevent external mutation.
+
+### History and Time Travel
+
+After every acknowledged message, flurryx captures a **full snapshot** of the store. The first entry (index `0`) is always the initial state captured when the store was created.
+
+```typescript
+const store = inject(ProductStore);
+
+// Inspect the full history
+const history = store.getHistory();
+// [
+//   { index: 0, id: null,  message: null, snapshot: { LIST: {...}, DETAIL: {...} } },
+//   { index: 1, id: 1,     message: { type: 'startLoading', key: 'LIST' }, snapshot: {...} },
+//   { index: 2, id: 2,     message: { type: 'update', key: 'LIST', ... }, snapshot: {...} },
+// ]
+
+// Filter history for a specific key
+const listHistory = store.getHistory('LIST');
+
+// Check current position
+const currentIndex = store.getCurrentIndex(); // 2
+
+// Jump to any recorded snapshot
+store.travelTo(0); // restore initial state
+store.travelTo(2); // jump back to latest
+
+// Step-by-step navigation
+store.undo(); // move to previous snapshot — returns false if already at index 0
+store.redo(); // move to next snapshot — returns false if already at latest
+```
+
+`travelTo`, `undo`, and `redo` restore snapshots only — they do **not** re-execute messages or create new history entries.
+
+### Message Replay
+
+Unlike time travel, **replay re-executes messages** through the full broker/consumer path. This creates new acknowledged history entries and can truncate future history if called after time travel.
+
+```typescript
+// Inspect all persisted messages
+const messages = store.getMessages();
+// [
+//   { id: 1, message: {...}, status: 'acknowledged', attempts: 1, ... },
+//   { id: 2, message: {...}, status: 'acknowledged', attempts: 1, ... },
+// ]
+
+// Filter messages for a specific key
+const listMessages = store.getMessages('LIST');
+
+// Re-execute a single message by its stable id
+store.replay(1); // returns count of acknowledged messages (0 or 1)
+
+// Re-execute multiple messages in the provided order
+store.replay([1, 2, 3]); // returns count of acknowledged messages
+```
+
+**When to use replay vs. time travel:**
+
+| | `travelTo` / `undo` / `redo` | `replay` |
+|---|---|---|
+| Mechanism | Restores a snapshot | Re-executes message(s) through broker |
+| Creates new history | No | Yes |
+| Fires `onUpdate` hooks | Yes | Yes |
+| Use case | Inspecting past state, undo/redo UX | Deterministic state reconstruction, recovery |
+
+### Dead-Letter Recovery
+
+When a message fails broker acknowledgement, it is moved to the **dead-letter queue** instead of crashing the application. Dead letters track the error message and attempt count.
+
+```typescript
+// Inspect failed messages
+const deadLetters = store.getDeadLetters();
+// [
+//   { id: 3, message: {...}, attempts: 1, error: 'Message was not acknowledged', failedAt: 1712... },
+// ]
+
+// Retry a single dead letter by its id
+const recovered = store.replayDeadLetter(3); // true if acknowledged, false if failed again
+
+// Retry all dead letters at once
+const count = store.replayDeadLetters(); // returns number of newly acknowledged messages
+```
+
+Successfully replayed dead letters are removed from the queue and produce new history entries. Failures remain with incremented attempt counts.
+
+---
+
+## Message Channels
+
+The message broker persists messages through a pluggable **channel** interface. The channel controls where messages are stored, how they are serialized, and how they survive (or don't survive) page refreshes.
+
+### Channel Types
+
+**In-memory** (default) — messages live in a JavaScript array. Fast, zero serialization overhead, but lost on page refresh.
+
+```typescript
+import { Store } from "flurryx";
+
+// Default — no configuration needed
+export const ProductStore = Store.for<ProductStoreConfig>().build();
+```
+
+**localStorage** — messages survive page refreshes and browser restarts. Same-origin only.
+
+```typescript
+import { Store, createLocalStorageStoreMessageChannel } from "flurryx";
+
+export const ProductStore = Store.for<ProductStoreConfig>().build({
+  channel: createLocalStorageStoreMessageChannel({
+    storageKey: 'product-store',
+  }),
+});
+```
+
+**sessionStorage** — messages survive page refreshes but are lost when the tab closes.
+
+```typescript
+import { Store, createSessionStorageStoreMessageChannel } from "flurryx";
+
+export const ProductStore = Store.for<ProductStoreConfig>().build({
+  channel: createSessionStorageStoreMessageChannel({
+    storageKey: 'product-store-session',
+  }),
+});
+```
+
+**Composite** — fan-out to multiple channels. The first channel is the primary (handles reads and id allocation); all channels receive writes.
+
+```typescript
+import {
+  Store,
+  createCompositeStoreMessageChannel,
+  createInMemoryStoreMessageChannel,
+  createLocalStorageStoreMessageChannel,
+} from "flurryx";
+
+export const ProductStore = Store.for<ProductStoreConfig>().build({
+  channel: createCompositeStoreMessageChannel({
+    channels: [
+      createInMemoryStoreMessageChannel(),          // primary — fast reads
+      createLocalStorageStoreMessageChannel({        // replica — persistent backup
+        storageKey: 'product-store-backup',
+      }),
+    ],
+  }),
+});
+```
+
+**Custom storage adapter** — bring your own `{ getItem, setItem, removeItem }` implementation (e.g. IndexedDB, a remote API, or an encrypted store).
+
+```typescript
+import { Store, createStorageStoreMessageChannel } from "flurryx";
+
+export const ProductStore = Store.for<ProductStoreConfig>().build({
+  channel: createStorageStoreMessageChannel({
+    storage: myCustomAdapter,
+    storageKey: 'product-store',
+  }),
+});
+```
+
+### Built-in Serialization
+
+Storage-backed channels automatically serialize and deserialize rich JavaScript types that `JSON.stringify` would lose:
+
+| Type | Serialized as |
+|---|---|
+| `Date` | `{ __flurryxType: 'date', value: '<ISO string>' }` |
+| `Map` | `{ __flurryxType: 'map', entries: [[key, value], ...] }` |
+| `Set` | `{ __flurryxType: 'set', values: [...] }` |
+| `undefined` | `{ __flurryxType: 'undefined' }` |
+| Primitives | Pass through unchanged |
+
+This means your store state can contain `Date` objects, `Map`s, and `Set`s and they will round-trip correctly through `localStorage` or `sessionStorage` without manual conversion.
+
+You can override serialization with custom `serialize` / `deserialize` hooks:
+
+```typescript
+createLocalStorageStoreMessageChannel({
+  storageKey: 'product-store',
+  serialize: (state) => JSON.stringify(state),
+  deserialize: (json) => JSON.parse(json),
+});
+```
+
+The `cloneValue` utility used internally is also exported for your own deep-clone needs:
+
+```typescript
+import { cloneValue } from "flurryx";
+
+const copy = cloneValue(original); // handles Date, Map, Set, circular refs
+```
 
 ---
 
@@ -1210,6 +1437,15 @@ Plain objects work with Angular's change detection and signals out of the box. M
 
 **Why `experimentalDecorators`?**
 The decorators use TypeScript's legacy decorator syntax. TC39 decorator migration is planned for a future release.
+
+**Why a synchronous broker instead of an async message queue?**
+JavaScript is single-threaded. Every store mutation — publish, consume, acknowledge, snapshot — completes in one synchronous call stack. This eliminates race conditions, ordering ambiguity, and the need for locks or semaphores. The broker is a transactional log, not a deferred queue: you get replay, undo/redo, and dead-letter recovery without async complexity.
+
+**Why snapshot-based undo/redo instead of command replay?**
+Replaying every message from the beginning is O(n) in the number of past mutations. Snapshot restoration is O(1) — jump to any point in history by restoring a pre-captured state object. The trade-off is memory (one snapshot per acknowledged message), but in practice store state is small and snapshots are cheap.
+
+**Why pluggable message channels?**
+Different apps have different persistence needs. A dev tool wants in-memory history that disappears on refresh. A form-heavy app wants `localStorage` so users don't lose drafts. An audit-sensitive workflow might want a composite channel that fans out to both memory and a remote API. The channel interface (`publish`, `getMessage`, `getMessages`, `saveMessage`) is intentionally minimal so custom adapters are easy to build.
 
 **Why tsup instead of ng-packagr?**
 flurryx contains no Angular components, templates, or directives — just TypeScript that calls `signal()` at runtime. Angular Package Format (APF) adds complexity without benefit here. tsup produces ESM + CJS + `.d.ts` in milliseconds.

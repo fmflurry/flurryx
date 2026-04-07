@@ -42,14 +42,19 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   private readonly hooks = new Map<string, UpdateCallback[]>();
   private readonly history: StoreHistoryDriver<TData>;
 
+  /** @inheritDoc */
   readonly travelTo = (index: number): void => this.history.travelTo(index);
 
+  /** @inheritDoc */
   readonly undo = (): boolean => this.history.undo();
 
+  /** @inheritDoc */
   readonly redo = (): boolean => this.history.redo();
 
+  /** @inheritDoc */
   getMessages(): readonly StoreMessageRecord<TData>[];
 
+  /** @inheritDoc */
   getMessages<K extends StoreKey<TData>>(
     key: K
   ): readonly StoreMessageRecord<TData, K>[];
@@ -62,17 +67,23 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     return this.history.getMessages(key);
   }
 
+  /** @inheritDoc */
   readonly getDeadLetters = () => this.history.getDeadLetters();
 
+  /** @inheritDoc */
   readonly replayDeadLetter = (id: number): boolean =>
     this.history.replayDeadLetter(id);
 
+  /** @inheritDoc */
   readonly replayDeadLetters = (): number => this.history.replayDeadLetters();
 
+  /** @inheritDoc */
   readonly getCurrentIndex = () => this.history.getCurrentIndex();
 
+  /** @inheritDoc */
   replay(id: number): number;
 
+  /** @inheritDoc */
   replay(ids: readonly number[]): number;
 
   replay(idOrIds: number | readonly number[]): number {
@@ -83,8 +94,10 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     return this.history.replay(idOrIds as number);
   }
 
+  /** @inheritDoc */
   getHistory(): readonly StoreHistoryEntry<TData>[];
 
+  /** @inheritDoc */
   getHistory<K extends StoreKey<TData>>(
     key: K
   ): readonly StoreHistoryEntry<TData, K>[];
@@ -233,11 +246,30 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     if (!keyHooks) {
       return;
     }
-    keyHooks.forEach((hook) =>
-      hook(
-        nextState as ResourceState<unknown>,
-        previousState as ResourceState<unknown>
-      )
-    );
+
+    const errors: unknown[] = [];
+
+    keyHooks.forEach((hook) => {
+      try {
+        hook(
+          nextState as ResourceState<unknown>,
+          previousState as ResourceState<unknown>
+        );
+      } catch (error: unknown) {
+        errors.push(error);
+      }
+    });
+
+    if (errors.length > 0) {
+      queueMicrotask(() => {
+        if (errors.length === 1) {
+          throw errors[0];
+        }
+        throw new AggregateError(
+          errors,
+          `${errors.length} onUpdate hooks threw for key "${String(key)}"`
+        );
+      });
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@angular/core", async () => {
   return import("../__mocks__/@angular/core");
@@ -226,6 +226,71 @@ describe("BaseStore", () => {
       expect(cb2).toHaveBeenCalledTimes(1);
 
       c2();
+    });
+
+    describe("onUpdate hook error isolation", () => {
+      let originalListeners: ((...args: unknown[]) => void)[];
+
+      beforeEach(() => {
+        originalListeners = process.rawListeners("uncaughtException") as ((
+          ...args: unknown[]
+        ) => void)[];
+        process.removeAllListeners("uncaughtException");
+        process.on("uncaughtException", () => {
+          /* swallow in test */
+        });
+      });
+
+      afterEach(() => {
+        process.removeAllListeners("uncaughtException");
+        originalListeners.forEach((listener) =>
+          process.on("uncaughtException", listener)
+        );
+      });
+
+      it("should call all hooks even when one throws", async () => {
+        const cb1 = vi.fn();
+        const cb2 = vi.fn(() => {
+          throw new Error("hook failed");
+        });
+        const cb3 = vi.fn();
+
+        store.onUpdate(TestStoreEnum.ITEM_ONE, cb1);
+        store.onUpdate(TestStoreEnum.ITEM_ONE, cb2);
+        store.onUpdate(TestStoreEnum.ITEM_ONE, cb3);
+
+        store.update(TestStoreEnum.ITEM_ONE, { data: "x" });
+
+        expect(cb1).toHaveBeenCalledTimes(1);
+        expect(cb2).toHaveBeenCalledTimes(1);
+        expect(cb3).toHaveBeenCalledTimes(1);
+        expect(store.get(TestStoreEnum.ITEM_ONE)().data).toBe("x");
+
+        await new Promise((r) => setTimeout(r, 0));
+      });
+
+      it("should call all hooks when multiple throw", async () => {
+        const cb1 = vi.fn(() => {
+          throw new Error("first");
+        });
+        const cb2 = vi.fn();
+        const cb3 = vi.fn(() => {
+          throw new Error("second");
+        });
+
+        store.onUpdate(TestStoreEnum.ITEM_ONE, cb1);
+        store.onUpdate(TestStoreEnum.ITEM_ONE, cb2);
+        store.onUpdate(TestStoreEnum.ITEM_ONE, cb3);
+
+        store.update(TestStoreEnum.ITEM_ONE, { data: "x" });
+
+        expect(cb1).toHaveBeenCalledTimes(1);
+        expect(cb2).toHaveBeenCalledTimes(1);
+        expect(cb3).toHaveBeenCalledTimes(1);
+        expect(store.get(TestStoreEnum.ITEM_ONE)().data).toBe("x");
+
+        await new Promise((r) => setTimeout(r, 0));
+      });
     });
 
     it("should handle different store instances independently", () => {

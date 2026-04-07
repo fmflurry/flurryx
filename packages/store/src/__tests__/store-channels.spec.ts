@@ -382,3 +382,120 @@ describe("in-memory channel", () => {
     expect(firstRead).toEqual(secondRead);
   });
 });
+
+describe("storage quota exhaustion", () => {
+  class QuotaLimitedStorage {
+    private readonly entries = new Map<string, string>();
+    private maxSize: number;
+
+    constructor(maxSize: number) {
+      this.maxSize = maxSize;
+    }
+
+    getItem(key: string): string | null {
+      return this.entries.get(key) ?? null;
+    }
+
+    setItem(key: string, value: string): void {
+      if (value.length > this.maxSize) {
+        const error = new DOMException(
+          "The quota has been exceeded.",
+          "QuotaExceededError"
+        );
+        throw error;
+      }
+      this.entries.set(key, value);
+    }
+
+    removeItem(key: string): void {
+      this.entries.delete(key);
+    }
+
+    setMaxSize(size: number): void {
+      this.maxSize = size;
+    }
+  }
+
+  it("should evict oldest messages when storage is full on publish", () => {
+    const storage = new QuotaLimitedStorage(Infinity);
+    const channel = createStorageStoreMessageChannel<TestStoreData>({
+      storage,
+      storageKey: "test-quota",
+    });
+
+    // Publish several messages with plenty of room
+    channel.publish(createUpdateMessage(["a"]));
+    channel.publish(createUpdateMessage(["b"]));
+    channel.publish(createUpdateMessage(["c"]));
+    channel.publish(createUpdateMessage(["d"]));
+    channel.publish(createUpdateMessage(["e"]));
+
+    expect(channel.getMessages()).toHaveLength(5);
+
+    // Tighten limit: allow roughly the same size as current (5 messages).
+    // Adding a 6th message will exceed the limit, triggering eviction.
+    const currentData = storage.getItem("test-quota")!;
+    storage.setMaxSize(currentData.length);
+
+    // This should trigger eviction of the oldest message(s)
+    channel.publish(createUpdateMessage(["f"]));
+
+    const remaining = channel.getMessages();
+    // Old messages were evicted, new one is present
+    expect(remaining.length).toBeLessThan(6);
+    expect(remaining.length).toBeGreaterThan(0);
+    // The newest message survived
+    const lastMessage = remaining[remaining.length - 1]!;
+    expect(lastMessage.message.type).toBe("update");
+    expect(
+      (lastMessage.message as { state: { data: string[] } }).state.data
+    ).toEqual(["f"]);
+    // The oldest message was evicted
+    const ids = remaining.map((r) => r.id);
+    expect(ids).not.toContain(1);
+  });
+
+  it("should evict oldest messages when storage is full on saveMessage", () => {
+    const storage = new QuotaLimitedStorage(Infinity);
+    const channel = createStorageStoreMessageChannel<TestStoreData>({
+      storage,
+      storageKey: "test-quota-save",
+    });
+
+    const record = channel.publish(createUpdateMessage(["a"]));
+    channel.publish(createUpdateMessage(["b"]));
+
+    const currentData = storage.getItem("test-quota-save")!;
+    storage.setMaxSize(currentData.length + 10);
+
+    // saveMessage triggers writeState — should evict if needed
+    channel.saveMessage({
+      ...record,
+      status: "acknowledged",
+      acknowledgedAt: Date.now(),
+    });
+
+    // Should not throw — eviction handled it
+    const messages = channel.getMessages();
+    expect(messages.length).toBeGreaterThan(0);
+  });
+
+  it("should throw non-quota errors", () => {
+    const storage = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("disk failure");
+      },
+      removeItem: () => {},
+    };
+
+    const channel = createStorageStoreMessageChannel<TestStoreData>({
+      storage,
+      storageKey: "test-error",
+    });
+
+    expect(() => channel.publish(createUpdateMessage(["a"]))).toThrow(
+      "disk failure"
+    );
+  });
+});

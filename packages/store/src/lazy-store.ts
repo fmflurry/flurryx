@@ -82,16 +82,16 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   readonly getCurrentIndex = () => this.historyDriver.getCurrentIndex();
 
   /** @inheritDoc */
-  readonly history!: Signal<readonly StoreHistoryEntry<TData>[]>;
+  readonly history: Signal<readonly StoreHistoryEntry<TData>[]>;
 
   /** @inheritDoc */
-  readonly messages!: Signal<readonly StoreMessageRecord<TData>[]>;
+  readonly messages: Signal<readonly StoreMessageRecord<TData>[]>;
 
   /** @inheritDoc */
-  readonly currentIndex!: Signal<number>;
+  readonly currentIndex: Signal<number>;
 
   /** @inheritDoc */
-  readonly keys!: Signal<readonly StoreKey<TData>[]>;
+  readonly keys: Signal<readonly StoreKey<TData>[]>;
 
   private readonly keysSignal = signal<readonly StoreKey<TData>[]>([]);
 
@@ -148,11 +148,10 @@ export class LazyStore<TData extends StoreDataShape<TData>>
       channel: options?.channel,
     });
 
-    const self = this as Record<string, unknown>;
-    self['history'] = this.historyDriver.historySignal;
-    self['messages'] = this.historyDriver.messagesSignal;
-    self['currentIndex'] = this.historyDriver.currentIndexSignal;
-    self['keys'] = this.keysSignal.asReadonly();
+    this.history = this.historyDriver.historySignal;
+    this.messages = this.historyDriver.messagesSignal;
+    this.currentIndex = this.historyDriver.currentIndexSignal;
+    this.keys = this.keysSignal.asReadonly();
 
     trackStore(this);
   }

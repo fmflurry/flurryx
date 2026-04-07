@@ -356,7 +356,7 @@ export function createUpdateKeyedOneMessage<
     key,
     resourceKey,
     entity,
-  } as StoreMessage<TData>;
+  } as unknown as StoreMessage<TData>;
 }
 
 export function createClearKeyedOneMessage<
@@ -367,7 +367,7 @@ export function createClearKeyedOneMessage<
     type: "clearKeyedOne",
     key,
     resourceKey,
-  } as StoreMessage<TData>;
+  } as unknown as StoreMessage<TData>;
 }
 
 export function createStartKeyedLoadingMessage<
@@ -378,5 +378,5 @@ export function createStartKeyedLoadingMessage<
     type: "startKeyedLoading",
     key,
     resourceKey,
-  } as StoreMessage<TData>;
+  } as unknown as StoreMessage<TData>;
 }

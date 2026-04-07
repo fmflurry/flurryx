@@ -18,10 +18,13 @@ export {
 // @flurryx/store
 export {
   BaseStore,
+  LazyStore,
   Store,
   clearAllStores,
   mirrorKey,
   collectKeyed,
+  cloneValue,
+  createSnapshotRestorePatch,
   createInMemoryStoreMessageChannel,
   createStorageStoreMessageChannel,
   createLocalStorageStoreMessageChannel,

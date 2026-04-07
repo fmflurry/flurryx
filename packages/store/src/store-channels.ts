@@ -1,8 +1,5 @@
 import type { StoreDataShape, StoreKey } from "./types";
-import type {
-  StoreMessage,
-  StoreMessageStatus,
-} from "./store-messages";
+import type { StoreMessage, StoreMessageStatus } from "./store-messages";
 import { cloneValue } from "./store-clone";
 
 /**
@@ -68,6 +65,7 @@ export interface StoreMessageChannelOptions<
   readonly channel?: StoreMessageChannel<TData, TKey>;
 }
 
+/** Options for {@link createCompositeStoreMessageChannel}. The first channel is the primary (reads + id allocation); replicas receive all writes. */
 export interface CompositeStoreMessageChannelOptions<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>
@@ -75,6 +73,7 @@ export interface CompositeStoreMessageChannelOptions<
   readonly channels: readonly StoreMessageChannel<TData, TKey>[];
 }
 
+/** Options for {@link createStorageStoreMessageChannel}. Provide a custom storage adapter, key, and optional serialize/deserialize hooks. */
 export interface StorageStoreMessageChannelOptions<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>
@@ -89,6 +88,7 @@ export interface StorageStoreMessageChannelOptions<
   ) => PersistedStoreMessageChannelState<TData, TKey>;
 }
 
+/** Options for {@link createLocalStorageStoreMessageChannel} and {@link createSessionStorageStoreMessageChannel}. Storage defaults to the browser global. */
 export interface BrowserStorageStoreMessageChannelOptions<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>
@@ -132,7 +132,7 @@ type SerializedStoreMessageChannelValue =
       readonly __flurryxType: "map";
       readonly entries: readonly [
         SerializedStoreMessageChannelValue,
-        SerializedStoreMessageChannelValue,
+        SerializedStoreMessageChannelValue
       ][];
     }
   | {
@@ -258,9 +258,7 @@ function defaultSerializeStoreMessageChannelState<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData>
 >(state: PersistedStoreMessageChannelState<TData, TKey>): string {
-  return JSON.stringify(
-    serializeStoreMessageChannelValue(state)
-  );
+  return JSON.stringify(serializeStoreMessageChannelValue(state));
 }
 
 function defaultDeserializeStoreMessageChannelState<
@@ -313,6 +311,16 @@ export function createInitialStoreMessageRecord<
   };
 }
 
+function isQuotaExceededError(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.code === 22 ||
+      error.code === 1014 ||
+      error.name === "QuotaExceededError" ||
+      error.name === "NS_ERROR_DOM_QUOTA_REACHED")
+  );
+}
+
 function resolveGlobalStorage(
   name: "localStorage" | "sessionStorage"
 ): StoreMessageChannelStorage {
@@ -328,6 +336,10 @@ function resolveGlobalStorage(
 // Channel factories
 // ---------------------------------------------------------------------------
 
+/**
+ * Creates an in-memory message channel. Messages are stored in a JavaScript array
+ * and lost on page refresh. This is the default channel when no `channel` option is provided.
+ */
 export function createInMemoryStoreMessageChannel<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>
@@ -357,7 +369,7 @@ export function createInMemoryStoreMessageChannel<
       if (existingIndex === -1) {
         messages = [...messages, record];
       } else {
-        messages = messages.map((c, i) => i === existingIndex ? record : c);
+        messages = messages.map((c, i) => (i === existingIndex ? record : c));
       }
 
       nextId = Math.max(nextId, record.id + 1);
@@ -365,6 +377,13 @@ export function createInMemoryStoreMessageChannel<
   };
 }
 
+/**
+ * Creates a message channel backed by a custom storage adapter.
+ * Messages are serialized and persisted via the provided `storage` object.
+ * When the storage quota is exceeded, the oldest messages are evicted automatically.
+ *
+ * @param options - Storage adapter, key, and optional serialize/deserialize hooks.
+ */
 export function createStorageStoreMessageChannel<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>
@@ -392,10 +411,35 @@ export function createStorageStoreMessageChannel<
   function writeState(
     state: PersistedStoreMessageChannelState<TData, TKey>
   ): void {
-    options.storage.setItem(
-      options.storageKey,
-      serialize(normalizeStoreMessageChannelState(state))
-    );
+    const normalized = normalizeStoreMessageChannelState(state);
+    try {
+      options.storage.setItem(options.storageKey, serialize(normalized));
+    } catch (error: unknown) {
+      if (!isQuotaExceededError(error) || normalized.messages.length === 0) {
+        throw error;
+      }
+      // Evict oldest messages one at a time until the write succeeds
+      let remaining = [...normalized.messages];
+      while (remaining.length > 0) {
+        remaining = remaining.slice(1);
+        try {
+          options.storage.setItem(
+            options.storageKey,
+            serialize({ nextId: normalized.nextId, messages: remaining })
+          );
+          return;
+        } catch (retryError: unknown) {
+          if (!isQuotaExceededError(retryError)) {
+            throw retryError;
+          }
+        }
+      }
+      // All messages evicted — write empty state
+      options.storage.setItem(
+        options.storageKey,
+        serialize({ nextId: normalized.nextId, messages: [] })
+      );
+    }
   }
 
   return {
@@ -444,6 +488,12 @@ export function createStorageStoreMessageChannel<
   };
 }
 
+/**
+ * Creates a message channel backed by `localStorage`.
+ * Messages survive page refreshes and browser restarts (same-origin only).
+ *
+ * @param options - Storage key and optional serialize/deserialize hooks.
+ */
 export function createLocalStorageStoreMessageChannel<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>
@@ -456,6 +506,12 @@ export function createLocalStorageStoreMessageChannel<
   });
 }
 
+/**
+ * Creates a message channel backed by `sessionStorage`.
+ * Messages survive page refreshes but are lost when the browser tab closes.
+ *
+ * @param options - Storage key and optional serialize/deserialize hooks.
+ */
 export function createSessionStorageStoreMessageChannel<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>
@@ -468,6 +524,12 @@ export function createSessionStorageStoreMessageChannel<
   });
 }
 
+/**
+ * Creates a composite message channel that fans out writes to multiple channels.
+ * The first channel is the primary (handles reads and id allocation); all channels receive writes.
+ *
+ * @param options - Array of channels. Must contain at least one.
+ */
 export function createCompositeStoreMessageChannel<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData> = StoreKey<TData>

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@angular/core", async () => {
   return import("../__mocks__/@angular/core");
@@ -153,6 +153,75 @@ describe("LazyStore", () => {
 
     expect(cb1).toHaveBeenCalledTimes(1);
     expect(cb2).toHaveBeenCalledTimes(1);
+  });
+
+  describe("onUpdate hook error isolation", () => {
+    // Hook errors are deferred via queueMicrotask — suppress unhandled errors in tests
+    let originalListeners: ((...args: unknown[]) => void)[];
+
+    beforeEach(() => {
+      originalListeners = process.rawListeners("uncaughtException") as ((
+        ...args: unknown[]
+      ) => void)[];
+      process.removeAllListeners("uncaughtException");
+      process.on("uncaughtException", () => {
+        /* swallow in test */
+      });
+    });
+
+    afterEach(() => {
+      process.removeAllListeners("uncaughtException");
+      originalListeners.forEach((listener) =>
+        process.on("uncaughtException", listener)
+      );
+    });
+
+    it("should call all hooks even when one throws", async () => {
+      const store = new LazyStore<TestData>();
+      const cb1 = vi.fn();
+      const cb2 = vi.fn(() => {
+        throw new Error("hook failed");
+      });
+      const cb3 = vi.fn();
+
+      store.onUpdate("items", cb1);
+      store.onUpdate("items", cb2);
+      store.onUpdate("items", cb3);
+
+      store.update("items", { data: ["x"] });
+
+      expect(cb1).toHaveBeenCalledTimes(1);
+      expect(cb2).toHaveBeenCalledTimes(1);
+      expect(cb3).toHaveBeenCalledTimes(1);
+      expect(store.get("items")().data).toEqual(["x"]);
+
+      // Flush microtask queue so deferred throw doesn't leak
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    it("should call all hooks when multiple throw", async () => {
+      const store = new LazyStore<TestData>();
+      const cb1 = vi.fn(() => {
+        throw new Error("first");
+      });
+      const cb2 = vi.fn();
+      const cb3 = vi.fn(() => {
+        throw new Error("second");
+      });
+
+      store.onUpdate("items", cb1);
+      store.onUpdate("items", cb2);
+      store.onUpdate("items", cb3);
+
+      store.update("items", { data: ["x"] });
+
+      expect(cb1).toHaveBeenCalledTimes(1);
+      expect(cb2).toHaveBeenCalledTimes(1);
+      expect(cb3).toHaveBeenCalledTimes(1);
+      expect(store.get("items")().data).toEqual(["x"]);
+
+      await new Promise((r) => setTimeout(r, 0));
+    });
   });
 
   describe("keyed operations", () => {

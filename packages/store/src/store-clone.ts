@@ -35,7 +35,10 @@ function cloneReference<T extends object>(
     const clonedMap = new Map<unknown, unknown>();
     seen.set(value, clonedMap);
     value.forEach((entryValue, key) => {
-      clonedMap.set(cloneValueWithSeen(key, seen), cloneValueWithSeen(entryValue, seen));
+      clonedMap.set(
+        cloneValueWithSeen(key, seen),
+        cloneValueWithSeen(entryValue, seen)
+      );
     });
     return clonedMap as T;
   }
@@ -59,9 +62,10 @@ function cloneReference<T extends object>(
     return clonedArray as T;
   }
 
-  const clonedObject = Object.create(
-    Object.getPrototypeOf(value)
-  ) as Record<PropertyKey, unknown>;
+  const clonedObject = Object.create(Object.getPrototypeOf(value)) as Record<
+    PropertyKey,
+    unknown
+  >;
   seen.set(value, clonedObject);
 
   Reflect.ownKeys(value).forEach((key) => {
@@ -88,10 +92,17 @@ function cloneValueWithSeen<T>(value: T, seen: WeakMap<object, unknown>): T {
   return value;
 }
 
-export function createSnapshotRestorePatch<TState extends ResourceState<unknown>>(
-  currentState: TState,
-  snapshotState: TState
-): Partial<TState> {
+/**
+ * Creates a minimal patch object that, when spread onto `currentState`, produces `snapshotState`.
+ * Properties present in the snapshot are cloned; properties absent from the snapshot are set to `undefined`.
+ *
+ * @param currentState - The current slot state.
+ * @param snapshotState - The target snapshot state to restore.
+ * @returns A partial state object suitable for `Signal.update()`.
+ */
+export function createSnapshotRestorePatch<
+  TState extends ResourceState<unknown>
+>(currentState: TState, snapshotState: TState): Partial<TState> {
   const patch: Record<PropertyKey, unknown> = {};
   const keys = new Set([
     ...Reflect.ownKeys(currentState),

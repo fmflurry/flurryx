@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { SnackbarComponent } from './core/snackbar/snackbar.component';
+import { StoreDevtoolsComponent } from './core/devtools/store-devtools.component';
 import { filter } from 'rxjs';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, SnackbarComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, SnackbarComponent, StoreDevtoolsComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

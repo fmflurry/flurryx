@@ -273,31 +273,34 @@ describe("built-in store broker history", () => {
     expect(store.get(ReplayStoreEnum.KEYED_MESSAGES)().data).toBeUndefined();
   });
 
-  it("moves failed messages to a dead-letter store and replays them after recovery", () => {
+  it("treats clearKeyedOne on empty keyed data as a successful no-op", () => {
     store.clearKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1");
 
-    expect(store.getHistory()).toHaveLength(1);
-    expect(store.getDeadLetters()).toHaveLength(1);
-    expect(store.getDeadLetters()[0]?.error).toBe("Message was not acknowledged");
+    expect(store.getDeadLetters()).toHaveLength(0);
+    expect(store.getMessages()).toHaveLength(1);
+    expect(store.getMessages()[0]?.status).toBe("acknowledged");
+    expect(store.getHistory()).toHaveLength(2);
+  });
 
+  it("moves failed messages to a dead-letter store and replays them after recovery", () => {
     store.updateKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1", {
       id: "m-1",
       text: "hello",
     });
 
-    const deadLetterId = store.getDeadLetters()[0]!.id;
-    expect(store.replayDeadLetter(deadLetterId)).toBe(true);
+    store.clearKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1");
+
     expect(store.getDeadLetters()).toHaveLength(0);
 
     const keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)()
       .data as KeyedResourceData<string, { id: string; text: string }>;
     expect(keyedData.entities["m-1"]).toBeUndefined();
+
+    const clearKeyedMsgId = store.getMessages().at(-1)!.id;
+    expect(store.replay(clearKeyedMsgId)).toBe(1);
   });
 
   it("replays all dead letters that can be acknowledged", () => {
-    store.clearKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1");
-    store.clearKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-2");
-
     store.updateKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1", {
       id: "m-1",
       text: "hello",
@@ -307,8 +310,15 @@ describe("built-in store broker history", () => {
       text: "world",
     });
 
-    expect(store.replayDeadLetters()).toBe(2);
+    store.clearKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1");
+    store.clearKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-2");
+
     expect(store.getDeadLetters()).toHaveLength(0);
+
+    const keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)()
+      .data as KeyedResourceData<string, { id: string; text: string }>;
+    expect(keyedData.entities["m-1"]).toBeUndefined();
+    expect(keyedData.entities["m-2"]).toBeUndefined();
   });
 
   it("persists messages in a storage-backed channel across store instances", () => {
@@ -353,9 +363,10 @@ describe("built-in store broker history", () => {
       storage: secondaryStorage,
       storageKey: "secondary-replay-store",
     });
-    const compositeChannel = createCompositeStoreMessageChannel<ReplayStoreData>({
-      channels: [primaryChannel, secondaryChannel],
-    });
+    const compositeChannel =
+      createCompositeStoreMessageChannel<ReplayStoreData>({
+        channels: [primaryChannel, secondaryChannel],
+      });
 
     store = new ReplayStore(compositeChannel);
     store.update(ReplayStoreEnum.COUNTER, {
@@ -391,7 +402,9 @@ describe("built-in store broker history", () => {
     const storedData = store.get(ReplayStoreEnum.META)().data;
 
     expect(storedData?.createdAt).toBeInstanceOf(Date);
-    expect(storedData?.createdAt.toISOString()).toBe("2024-01-01T00:00:00.000Z");
+    expect(storedData?.createdAt.toISOString()).toBe(
+      "2024-01-01T00:00:00.000Z"
+    );
     expect(storedData?.lookup).toBeInstanceOf(Map);
     expect(Array.from(storedData?.lookup.entries() ?? [])).toEqual([
       ["version", 1],
@@ -407,7 +420,9 @@ describe("built-in store broker history", () => {
 
     const replayedData = store.get(ReplayStoreEnum.META)().data;
 
-    expect(replayedData?.createdAt.toISOString()).toBe("2024-01-01T00:00:00.000Z");
+    expect(replayedData?.createdAt.toISOString()).toBe(
+      "2024-01-01T00:00:00.000Z"
+    );
     expect(Array.from(replayedData?.lookup.entries() ?? [])).toEqual([
       ["version", 1],
     ]);
@@ -518,9 +533,7 @@ describe("built-in store broker history", () => {
     expect(() => store.travelTo(Number.NaN)).toThrow(
       "History index is out of range"
     );
-    expect(() => store.travelTo(0.5)).toThrow(
-      "History index is out of range"
-    );
+    expect(() => store.travelTo(0.5)).toThrow("History index is out of range");
 
     store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
     const validId = store.getHistory()[1]!.id;
@@ -538,7 +551,8 @@ describe("built-in store broker history", () => {
   });
 
   it("preserves correlated typing on broker replay methods", () => {
-    const history: readonly StoreHistoryEntry<ReplayStoreData>[] = store.getHistory();
+    const history: readonly StoreHistoryEntry<ReplayStoreData>[] =
+      store.getHistory();
     const keyedHistory = store.getHistory(ReplayStoreEnum.KEYED_MESSAGES);
     const keyedMessages = store.getMessages(ReplayStoreEnum.KEYED_MESSAGES);
 

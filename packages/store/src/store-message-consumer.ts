@@ -164,7 +164,7 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
     const previousState = sig();
     const state = previousState as ResourceState<unknown>;
     if (!isKeyedResourceData(state.data)) {
-      return false;
+      return true;
     }
 
     const data = state.data;

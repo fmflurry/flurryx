@@ -14,3 +14,7 @@ npm-debug.log*
 
 # Reports
 code-review-report.html
+
+# Tooling artifacts
+.scannerwork/
+.opencode/

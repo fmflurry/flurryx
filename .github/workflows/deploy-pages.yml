@@ -37,6 +37,17 @@ jobs:
       - name: Build library packages
         run: npm run build
 
+      - name: Install sample app dependencies
+        run: npm ci
+        working-directory: samples/taskflurry
+
+      - name: Sync library dist to sample node_modules
+        run: |
+          cp -r packages/core/dist/* samples/taskflurry/node_modules/@flurryx/core/dist/
+          cp -r packages/store/dist/* samples/taskflurry/node_modules/@flurryx/store/dist/
+          cp -r packages/rx/dist/* samples/taskflurry/node_modules/@flurryx/rx/dist/
+          cp -r packages/flurryx/dist/* samples/taskflurry/node_modules/flurryx/dist/
+
       - name: Build sample app for GitHub Pages
         run: npx ng build --base-href /flurryx/
         working-directory: samples/taskflurry

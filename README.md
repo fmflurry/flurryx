@@ -18,7 +18,7 @@
     <img src="https://github.com/fmflurry/flurryx/actions/workflows/ci.yml/badge.svg?branch=master" alt="Build status" />
   </a>
   <a href="https://github.com/fmflurry/flurryx/actions/workflows/ci.yml">
-    <img src="https://img.shields.io/badge/coverage%20snapshot-62.85%25-f0ad4e" alt="Coverage snapshot 62.85%" />
+    <img src="https://img.shields.io/badge/coverage-91%25-brightgreen" alt="Coverage 91%" />
   </a>
   <a href="https://angular.dev/">
     <img src="https://img.shields.io/badge/Angular-%3E%3D17-dd0031" alt="Angular >=17" />

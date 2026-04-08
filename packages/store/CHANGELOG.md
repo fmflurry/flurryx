@@ -1,5 +1,13 @@
 # @flurryx/store
 
+## 1.0.1
+
+### Patch Changes
+
+- e23886f: Expose reactive `history`, `messages`, `currentIndex`, and `keys` signals on the public store contract so UI tooling can observe store activity directly.
+- 6e62603: Fix public signal-store typings so the shared store contract remains type-safe when consuming the new reactive metadata signals.
+- f6a3c8d: Refactor constructor field assignments to simplify the typed history-driver wiring introduced in the `1.0.x` line.
+
 ## 0.8.3
 
 ### Patch Changes

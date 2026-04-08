@@ -3,11 +3,13 @@ import { RouterLink } from '@angular/router';
 
 import { ProjectsFacade } from '../../application/facades/projects.facade';
 import { Project } from '../../domain/models/project.model';
+import { PROJECTS_STORE } from '../../application/store/projects.store';
+import { StoreHistoryVizComponent } from '../../../core/devtools/store-history-viz.component';
 
 @Component({
   selector: 'app-projects-list',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, StoreHistoryVizComponent],
   templateUrl: './projects-list.component.html',
   styleUrl: './projects-list.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,6 +44,8 @@ export class ProjectsListComponent implements OnInit {
     return this.allTasks().filter((t) => t.projectId === projectId);
   });
   protected readonly isLoadingTasks = computed(() => this.tasksState().isLoading ?? false);
+
+  protected readonly historyStore = inject(PROJECTS_STORE);
 
   ngOnInit(): void {
     this.facade.loadProjects();

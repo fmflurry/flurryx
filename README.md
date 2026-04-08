@@ -126,6 +126,22 @@ Angular signals are great for synchronous reactivity, but real applications stil
 
 flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cache/loading decorators, store composition helpers, and a message broker with pluggable channels.
 
+### How it stacks up
+
+| Capability | NgRx | NGXS | Elf | **flurryx** |
+| --- | --- | --- | --- | --- |
+| Store definition | Actions + Reducers + Selectors | State class + Actions | Repository + Store | **One interface** |
+| Boilerplate for a CRUD feature | ~8 files | ~5 files | ~4 files | **~2 files** |
+| Signal-native | Adapter needed | No | No | **Built-in** |
+| Loading / error per slot | Manual | Manual | Partial | **Automatic** |
+| Per-entity keyed state | @ngrx/entity (extra package) | Manual | Manual | **Built-in KeyedResourceData** |
+| Cache deduplication | Manual | Manual | Manual | **@SkipIfCached decorator** |
+| **Built-in undo / redo / replay** | **No** | **No** | **No** | **Yes — with dead-letter recovery** |
+| Message persistence | No | No | No | **Pluggable channels (localStorage, etc.)** |
+| Bundle size impact | Large (multiple packages) | Medium | Small | **Small (no components, just signals)** |
+| Learning curve | Steep (Redux concepts) | Moderate | Low-moderate | **Low (signals + RxJS you already know)** |
+| Best for | Teams already invested in Redux patterns | Medium-large apps | Any size, flexible | **Any size — from simple CRUD to complex stateful apps** |
+
 ---
 
 ## Feature Summary

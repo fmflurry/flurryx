@@ -67,10 +67,10 @@ One interface, one line — you get a fully typed, injectable store with loading
 ```typescript
 @Component({
   template: `
-    @if (state().isLoading) { <spinner /> }
-    @if (state().status === 'Error') { <error-banner [errors]="state().errors" /> }
-    @for (product of state().data; track product.id) {
-      <product-card [product]="product" />
+    @if (state().isLoading) { <spinner /> } @if (state().status === 'Error') {
+    <error-banner [errors]="state().errors" /> } @for (product of state().data;
+    track product.id) {
+    <product-card [product]="product" />
     }
   `,
 })
@@ -115,32 +115,32 @@ The store is the foundation. Layer on facades, decorators, mirroring, and messag
 
 Angular signals are great for synchronous reactivity, but real applications still need RxJS for HTTP calls, WebSockets, and other async sources. The space between "I fired a request" and "my template shows the result" is where complexity piles up:
 
-| Problem | Without flurryx | With flurryx |
-| --- | --- | --- |
-| Loading spinners | Manual boolean flags, race conditions | `store.get(key)().isLoading` |
-| Error handling | Scattered `catchError`, inconsistent shapes | Normalized `{ code, message }[]` on every slot |
-| Caching | Custom `shareReplay` / `BehaviorSubject` | `@SkipIfCached` — one decorator |
-| Duplicate requests | Manual inflight tracking | `@SkipIfCached` deduplicates while loading |
-| Keyed resources | Separate state per ID, boilerplate explosion | `KeyedResourceData` with per-key loading/error |
-| Replay and history | Ad hoc logging, custom devtools | Built-in message log, undo, redo, replay by id |
+| Problem            | Without flurryx                              | With flurryx                                   |
+| ------------------ | -------------------------------------------- | ---------------------------------------------- |
+| Loading spinners   | Manual boolean flags, race conditions        | `store.get(key)().isLoading`                   |
+| Error handling     | Scattered `catchError`, inconsistent shapes  | Normalized `{ code, message }[]` on every slot |
+| Caching            | Custom `shareReplay` / `BehaviorSubject`     | `@SkipIfCached` — one decorator                |
+| Duplicate requests | Manual inflight tracking                     | `@SkipIfCached` deduplicates while loading     |
+| Keyed resources    | Separate state per ID, boilerplate explosion | `KeyedResourceData` with per-key loading/error |
+| Replay and history | Ad hoc logging, custom devtools              | Built-in message log, undo, redo, replay by id |
 
 flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cache/loading decorators, store composition helpers, and a message broker with pluggable channels.
 
 ### How it stacks up
 
-| Capability | NgRx | NGXS | Elf | **flurryx** |
-| --- | --- | --- | --- | --- |
-| Store definition | Actions + Reducers + Selectors | State class + Actions | Repository + Store | **One interface** |
-| Boilerplate for a CRUD feature | ~8 files | ~5 files | ~4 files | **~2 files** |
-| Signal-native | Adapter needed | No | No | **Built-in** |
-| Loading / error per slot | Manual | Manual | Partial | **Automatic** |
-| Per-entity keyed state | @ngrx/entity (extra package) | Manual | Manual | **Built-in KeyedResourceData** |
-| Cache deduplication | Manual | Manual | Manual | **@SkipIfCached decorator** |
-| **Built-in undo / redo / replay** | **No** | **No** | **No** | **Yes — with dead-letter recovery** |
-| Message persistence | No | No | No | **Pluggable channels (localStorage, etc.)** |
-| Bundle size impact | Large (multiple packages) | Medium | Small | **Small (no components, just signals)** |
-| Learning curve | Steep (Redux concepts) | Moderate | Low-moderate | **Low (signals + RxJS you already know)** |
-| Best for | Teams already invested in Redux patterns | Medium-large apps | Any size, flexible | **Any size — from simple CRUD to complex stateful apps** |
+| Capability                        | NgRx                                     | NGXS                  | Elf                | **flurryx**                                              |
+| --------------------------------- | ---------------------------------------- | --------------------- | ------------------ | -------------------------------------------------------- |
+| Store definition                  | Actions + Reducers + Selectors           | State class + Actions | Repository + Store | **One interface**                                        |
+| Boilerplate for a CRUD feature    | ~8 files                                 | ~5 files              | ~4 files           | **~2 files**                                             |
+| Signal-native                     | Adapter needed                           | No                    | No                 | **Built-in**                                             |
+| Loading / error per slot          | Manual                                   | Manual                | Partial            | **Automatic**                                            |
+| Per-entity keyed state            | @ngrx/entity (extra package)             | Manual                | Manual             | **Built-in KeyedResourceData**                           |
+| Cache deduplication               | Manual                                   | Manual                | Manual             | **@SkipIfCached decorator**                              |
+| **Built-in undo / redo / replay** | **No**                                   | **No**                | **No**             | **Yes — with dead-letter recovery**                      |
+| Message persistence               | No                                       | No                    | No                 | **Pluggable channels (localStorage, etc.)**              |
+| Bundle size impact                | Large (multiple packages)                | Medium                | Small              | **Small (no components, just signals)**                  |
+| Learning curve                    | Steep (Redux concepts)                   | Moderate              | Low-moderate       | **Low (signals + RxJS you already know)**                |
+| Best for                          | Teams already invested in Redux patterns | Medium-large apps     | Any size, flexible | **Any size — from simple CRUD to complex stateful apps** |
 
 ---
 
@@ -151,6 +151,7 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 <td width="50%" valign="top">
 
 ### Store & Signals
+
 - **Typed signal stores** — interface in, signals out
 - **Loading & error lifecycle** — automatic on every slot
 - **Keyed entity caches** — per-entity loading, status, errors
@@ -160,6 +161,7 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 <td width="50%" valign="top">
 
 ### RxJS Bridge
+
 - **syncToStore** — pipe HTTP calls into the store
 - **@SkipIfCached** — skip when data is fresh
 - **@Loading** — auto-set loading flags
@@ -170,6 +172,7 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 <td width="50%" valign="top">
 
 ### Message Broker
+
 - **Message queueing** — typed, immutable, traceable
 - **History & time travel** — undo, redo, restoreStoreAt, restoreResource
 - **Replay** — re-execute messages by id
@@ -181,6 +184,7 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 <td width="50%" valign="top">
 
 ### Store Composition
+
 - **Mirroring** — `.mirror()`, `.mirrorSelf()`, `.mirrorKeyed()`
 - **mirrorKey / collectKeyed** — imperative wiring with cleanup
 
@@ -225,6 +229,7 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
   - [Builder .mirrorKeyed()](#builder-mirrorkeyed)
   - [mirrorKey](#mirrorkey)
   - [collectKeyed](#collectkeyed)
+- [AI Coding](#ai-coding)
 - [Design Decisions](#design-decisions)
 - [Contributing](#contributing)
 - [License](#license)
@@ -233,12 +238,12 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 
 ## Packages
 
-| Package | Purpose |
-| ------- | ------- |
-| `flurryx` | The umbrella package. Import the full toolkit from a single entry point. |
-| `@flurryx/core` | Shared types, keyed resource helpers, and cache constants. |
+| Package          | Purpose                                                                                      |
+| ---------------- | -------------------------------------------------------------------------------------------- |
+| `flurryx`        | The umbrella package. Import the full toolkit from a single entry point.                     |
+| `@flurryx/core`  | Shared types, keyed resource helpers, and cache constants.                                   |
 | `@flurryx/store` | Signal-backed stores, invalidation helpers, mirroring utilities, and replay/history control. |
-| `@flurryx/rx` | RxJS bridge operators, decorators, and pluggable error normalization. |
+| `@flurryx/rx`    | RxJS bridge operators, decorators, and pluggable error normalization.                        |
 
 ---
 
@@ -427,15 +432,18 @@ interface MyStoreConfig {
 export const MyStore = Store.for<MyStoreConfig>().build();
 
 // 2. Fluent chaining — inline slot definitions
-export const MyStore = Store
-  .resource('USERS').as<User[]>()
-  .resource('SELECTED').as<User>()
+export const MyStore = Store.resource("USERS")
+  .as<User[]>()
+  .resource("SELECTED")
+  .as<User>()
   .build();
 
 // 3. Enum-constrained — validates keys against a runtime enum
 export const MyStore = Store.for(MyStoreEnum)
-  .resource('USERS').as<User[]>()
-  .resource('SELECTED').as<User>()
+  .resource("USERS")
+  .as<User[]>()
+  .resource("SELECTED")
+  .as<User>()
   .build();
 ```
 
@@ -443,7 +451,7 @@ Once injected, the store exposes these methods:
 
 | Method                    | Description                                                                           |
 | ------------------------- | ------------------------------------------------------------------------------------- |
-| `get(key)`                | Returns the `Signal` for a slot                                               |
+| `get(key)`                | Returns the `Signal` for a slot                                                       |
 | `update(key, partial)`    | Merges partial state (immutable spread)                                               |
 | `clear(key)`              | Resets a slot to its initial empty state                                              |
 | `clearAll()`              | Resets every slot                                                                     |
@@ -490,10 +498,10 @@ Type safety is fully enforced:
 ```typescript
 const store = inject(ChatStore);
 
-store.get('SESSIONS');                          // Signal<ResourceState<ChatSession[]>>
-store.update('SESSIONS', { data: [session] });  // ✅ type-checked
-store.update('SESSIONS', { data: 42 });         // ❌ TS error — number is not ChatSession[]
-store.get('INVALID');                           // ❌ TS error — key does not exist
+store.get("SESSIONS"); // Signal<ResourceState<ChatSession[]>>
+store.update("SESSIONS", { data: [session] }); // ✅ type-checked
+store.update("SESSIONS", { data: 42 }); // ❌ TS error — number is not ChatSession[]
+store.get("INVALID"); // ❌ TS error — key does not exist
 ```
 
 #### Fluent chaining: `Store.resource().as<T>().build()`
@@ -501,10 +509,12 @@ store.get('INVALID');                           // ❌ TS error — key does not
 Define slots inline without a separate interface:
 
 ```typescript
-export const ChatStore = Store
-  .resource('SESSIONS').as<ChatSession[]>()
-  .resource('CURRENT_SESSION').as<ChatSession>()
-  .resource('MESSAGES').as<ChatMessage[]>()
+export const ChatStore = Store.resource("SESSIONS")
+  .as<ChatSession[]>()
+  .resource("CURRENT_SESSION")
+  .as<ChatSession>()
+  .resource("MESSAGES")
+  .as<ChatMessage[]>()
   .build();
 ```
 
@@ -514,15 +524,18 @@ When you have a runtime enum (e.g. shared with backend code), pass it to `.for()
 
 ```typescript
 const ChatStoreEnum = {
-  SESSIONS: 'SESSIONS',
-  CURRENT_SESSION: 'CURRENT_SESSION',
-  MESSAGES: 'MESSAGES',
+  SESSIONS: "SESSIONS",
+  CURRENT_SESSION: "CURRENT_SESSION",
+  MESSAGES: "MESSAGES",
 } as const;
 
 export const ChatStore = Store.for(ChatStoreEnum)
-  .resource('SESSIONS').as<ChatSession[]>()
-  .resource('CURRENT_SESSION').as<ChatSession>()
-  .resource('MESSAGES').as<ChatMessage[]>()
+  .resource("SESSIONS")
+  .as<ChatSession[]>()
+  .resource("CURRENT_SESSION")
+  .as<ChatSession>()
+  .resource("MESSAGES")
+  .as<ChatMessage[]>()
   .build();
 ```
 
@@ -535,7 +548,7 @@ RxJS pipeable operator that bridges an `Observable` to a store slot.
 ```typescript
 this.http
   .get<Product[]>("/api/products")
-  .pipe(syncToStore(this.store, 'LIST'))
+  .pipe(syncToStore(this.store, "LIST"))
   .subscribe();
 ```
 
@@ -562,7 +575,7 @@ Same pattern, but targets a specific resource key within a `KeyedResourceData` s
 ```typescript
 this.http
   .get<Invoice>(`/api/invoices/${id}`)
-  .pipe(syncToKeyedStore(this.store, 'ITEMS', id))
+  .pipe(syncToKeyedStore(this.store, "ITEMS", id))
   .subscribe();
 ```
 
@@ -571,7 +584,7 @@ Only the targeted resource key is updated. Other keys in the same slot are untou
 **`mapResponse`** — transform the API response before writing to the store:
 
 ```typescript
-syncToKeyedStore(this.store, 'ITEMS', id, {
+syncToKeyedStore(this.store, "ITEMS", id, {
   mapResponse: (response) => response.data,
 });
 ```
@@ -664,7 +677,7 @@ import { httpErrorNormalizer } from "flurryx/http";
 this.http
   .get("/api/data")
   .pipe(
-    syncToStore(this.store, 'DATA', {
+    syncToStore(this.store, "DATA", {
       errorNormalizer: httpErrorNormalizer,
     }),
   )
@@ -716,8 +729,8 @@ Each resource key gets **independent** loading, status, and error tracking. The 
 import { Store } from "flurryx";
 import type { KeyedResourceData } from "flurryx";
 
-export const InvoiceStore = Store
-  .resource('ITEMS').as<KeyedResourceData<string, Invoice>>()
+export const InvoiceStore = Store.resource("ITEMS")
+  .as<KeyedResourceData<string, Invoice>>()
   .build();
 
 // Facade
@@ -725,14 +738,14 @@ export const InvoiceStore = Store
 export class InvoiceFacade {
   private readonly http = inject(HttpClient);
   readonly store = inject(InvoiceStore);
-  readonly items = this.store.get('ITEMS');
+  readonly items = this.store.get("ITEMS");
 
-  @SkipIfCached('ITEMS', (i: InvoiceFacade) => i.store)
-  @Loading('ITEMS', (i: InvoiceFacade) => i.store)
+  @SkipIfCached("ITEMS", (i: InvoiceFacade) => i.store)
+  @Loading("ITEMS", (i: InvoiceFacade) => i.store)
   loadInvoice(id: string) {
     this.http
       .get<Invoice>(`/api/invoices/${id}`)
-      .pipe(syncToKeyedStore(this.store, 'ITEMS', id))
+      .pipe(syncToKeyedStore(this.store, "ITEMS", id))
       .subscribe();
   }
 }
@@ -768,7 +781,7 @@ Reset an entire store slot back to its initial empty state:
 const store = inject(ProductStore);
 
 // Clear a single slot
-store.clear('LIST');
+store.clear("LIST");
 // LIST is now { data: undefined, isLoading: false, status: undefined, errors: undefined }
 
 // Clear every slot in the store
@@ -799,7 +812,7 @@ const store = inject(InvoiceStore);
 
 // Remove only invoice "inv-42" from the cache.
 // All other cached invoices remain untouched.
-store.clearKeyedOne('ITEMS', 'inv-42');
+store.clearKeyedOne("ITEMS", "inv-42");
 ```
 
 `clearKeyedOne` removes the entity, its loading flag, status, and errors for that single key, then recalculates the top-level `isLoading` based on the remaining keys.
@@ -807,7 +820,7 @@ store.clearKeyedOne('ITEMS', 'inv-42');
 **Facade example — delete an invoice and evict it from cache:**
 
 ```typescript
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class InvoiceFacade {
   private readonly http = inject(HttpClient);
   readonly store = inject(InvoiceStore);
@@ -815,7 +828,7 @@ export class InvoiceFacade {
   deleteInvoice(id: string) {
     this.http.delete(`/api/invoices/${id}`).subscribe(() => {
       // Remove only this invoice from the keyed cache
-      this.store.clearKeyedOne('ITEMS', id);
+      this.store.clearKeyedOne("ITEMS", id);
     });
   }
 }
@@ -823,12 +836,12 @@ export class InvoiceFacade {
 
 **Comparison:**
 
-| Method | Scope | Use when |
-|---|---|---|
-| `clear(key)` | Entire slot | Logging out, resetting a form, full refresh |
-| `clearAll()` | Every slot in one store | Reset one feature store |
-| `clearAllStores()` | Every tracked store instance | Logout, tenant switch, full app cache reset |
-| `clearKeyedOne(key, resourceKey)` | Single entity in a keyed slot | Deleting or invalidating one cached item |
+| Method                            | Scope                         | Use when                                    |
+| --------------------------------- | ----------------------------- | ------------------------------------------- |
+| `clear(key)`                      | Entire slot                   | Logging out, resetting a form, full refresh |
+| `clearAll()`                      | Every slot in one store       | Reset one feature store                     |
+| `clearAllStores()`                | Every tracked store instance  | Logout, tenant switch, full app cache reset |
+| `clearKeyedOne(key, resourceKey)` | Single entity in a keyed slot | Deleting or invalidating one cached item    |
 
 ---
 
@@ -872,16 +885,16 @@ All of this happens **synchronously** in a single call. When `store.update()` re
 
 Every store method produces one of these typed messages:
 
-| Message type | Produced by | Payload |
-|---|---|---|
-| `update` | `update(key, partial)` | `key`, `state` (partial merge) |
-| `clear` | `clear(key)` | `key` |
-| `clearAll` | `clearAll()` | _(none — affects all slots)_ |
-| `startLoading` | `startLoading(key)` | `key` |
-| `stopLoading` | `stopLoading(key)` | `key` |
-| `updateKeyedOne` | `updateKeyedOne(key, rk, entity)` | `key`, `resourceKey`, `entity` |
-| `clearKeyedOne` | `clearKeyedOne(key, rk)` | `key`, `resourceKey` |
-| `startKeyedLoading` | `startKeyedLoading(key, rk)` | `key`, `resourceKey` |
+| Message type        | Produced by                       | Payload                        |
+| ------------------- | --------------------------------- | ------------------------------ |
+| `update`            | `update(key, partial)`            | `key`, `state` (partial merge) |
+| `clear`             | `clear(key)`                      | `key`                          |
+| `clearAll`          | `clearAll()`                      | _(none — affects all slots)_   |
+| `startLoading`      | `startLoading(key)`               | `key`                          |
+| `stopLoading`       | `stopLoading(key)`                | `key`                          |
+| `updateKeyedOne`    | `updateKeyedOne(key, rk, entity)` | `key`, `resourceKey`, `entity` |
+| `clearKeyedOne`     | `clearKeyedOne(key, rk)`          | `key`, `resourceKey`           |
+| `startKeyedLoading` | `startKeyedLoading(key, rk)`      | `key`, `resourceKey`           |
 
 Messages are immutable and deep-cloned on publish to prevent external mutation.
 
@@ -901,7 +914,7 @@ const history = store.getHistory();
 // ]
 
 // Filter history for a specific key
-const listHistory = store.getHistory('LIST');
+const listHistory = store.getHistory("LIST");
 
 // Check current position
 const currentIndex = store.getCurrentIndex(); // 2
@@ -911,8 +924,8 @@ store.restoreStoreAt(0); // restore initial state
 store.restoreStoreAt(2); // jump back to latest
 
 // Restore a single key without affecting others
-store.restoreResource('LIST', 0); // restore only LIST to its state at snapshot 0
-store.restoreResource('LIST');      // restore LIST to its state at the current index
+store.restoreResource("LIST", 0); // restore only LIST to its state at snapshot 0
+store.restoreResource("LIST"); // restore LIST to its state at the current index
 
 // Step-by-step navigation
 store.undo(); // move to previous snapshot — returns false if already at index 0
@@ -936,7 +949,7 @@ const messages = store.getMessages();
 // ]
 
 // Filter messages for a specific key
-const listMessages = store.getMessages('LIST');
+const listMessages = store.getMessages("LIST");
 
 // Re-execute a single message by its stable id
 store.replay(1); // returns count of acknowledged messages (0 or 1)
@@ -947,13 +960,13 @@ store.replay([1, 2, 3]); // returns count of acknowledged messages
 
 **When to use replay vs. time travel:**
 
-| | `restoreStoreAt` / `undo` / `redo` | `restoreResource` | `replay` |
-|---|---|---|---|
-| Mechanism | Restores full snapshot | Restores single key from snapshot | Re-executes message(s) through broker |
-| Affects other keys | Yes — entire store | No — only specified key | Depends on message |
-| Creates new history | No | No | Yes |
-| Fires `onUpdate` hooks | Yes | Yes (for restored key only) | Yes |
-| Use case | Inspecting past state, undo/redo UX | Key-scoped time travel, devtools history | Deterministic state reconstruction, recovery |
+|                        | `restoreStoreAt` / `undo` / `redo`  | `restoreResource`                        | `replay`                                     |
+| ---------------------- | ----------------------------------- | ---------------------------------------- | -------------------------------------------- |
+| Mechanism              | Restores full snapshot              | Restores single key from snapshot        | Re-executes message(s) through broker        |
+| Affects other keys     | Yes — entire store                  | No — only specified key                  | Depends on message                           |
+| Creates new history    | No                                  | No                                       | Yes                                          |
+| Fires `onUpdate` hooks | Yes                                 | Yes (for restored key only)              | Yes                                          |
+| Use case               | Inspecting past state, undo/redo UX | Key-scoped time travel, devtools history | Deterministic state reconstruction, recovery |
 
 ### Dead-Letter Recovery
 
@@ -999,7 +1012,7 @@ import { Store, createLocalStorageStoreMessageChannel } from "flurryx";
 
 export const ProductStore = Store.for<ProductStoreConfig>().build({
   channel: createLocalStorageStoreMessageChannel({
-    storageKey: 'product-store',
+    storageKey: "product-store",
   }),
 });
 ```
@@ -1011,7 +1024,7 @@ import { Store, createSessionStorageStoreMessageChannel } from "flurryx";
 
 export const ProductStore = Store.for<ProductStoreConfig>().build({
   channel: createSessionStorageStoreMessageChannel({
-    storageKey: 'product-store-session',
+    storageKey: "product-store-session",
   }),
 });
 ```
@@ -1029,9 +1042,10 @@ import {
 export const ProductStore = Store.for<ProductStoreConfig>().build({
   channel: createCompositeStoreMessageChannel({
     channels: [
-      createInMemoryStoreMessageChannel(),          // primary — fast reads
-      createLocalStorageStoreMessageChannel({        // replica — persistent backup
-        storageKey: 'product-store-backup',
+      createInMemoryStoreMessageChannel(), // primary — fast reads
+      createLocalStorageStoreMessageChannel({
+        // replica — persistent backup
+        storageKey: "product-store-backup",
       }),
     ],
   }),
@@ -1046,7 +1060,7 @@ import { Store, createStorageStoreMessageChannel } from "flurryx";
 export const ProductStore = Store.for<ProductStoreConfig>().build({
   channel: createStorageStoreMessageChannel({
     storage: myCustomAdapter,
-    storageKey: 'product-store',
+    storageKey: "product-store",
   }),
 });
 ```
@@ -1055,13 +1069,13 @@ export const ProductStore = Store.for<ProductStoreConfig>().build({
 
 Storage-backed channels automatically serialize and deserialize rich JavaScript types that `JSON.stringify` would lose:
 
-| Type | Serialized as |
-|---|---|
-| `Date` | `{ __flurryxType: 'date', value: '<ISO string>' }` |
-| `Map` | `{ __flurryxType: 'map', entries: [[key, value], ...] }` |
-| `Set` | `{ __flurryxType: 'set', values: [...] }` |
-| `undefined` | `{ __flurryxType: 'undefined' }` |
-| Primitives | Pass through unchanged |
+| Type        | Serialized as                                            |
+| ----------- | -------------------------------------------------------- |
+| `Date`      | `{ __flurryxType: 'date', value: '<ISO string>' }`       |
+| `Map`       | `{ __flurryxType: 'map', entries: [[key, value], ...] }` |
+| `Set`       | `{ __flurryxType: 'set', values: [...] }`                |
+| `undefined` | `{ __flurryxType: 'undefined' }`                         |
+| Primitives  | Pass through unchanged                                   |
 
 This means your store state can contain `Date` objects, `Map`s, and `Set`s and they will round-trip correctly through `localStorage` or `sessionStorage` without manual conversion.
 
@@ -1069,7 +1083,7 @@ You can override serialization with custom `serialize` / `deserialize` hooks:
 
 ```typescript
 createLocalStorageStoreMessageChannel({
-  storageKey: 'product-store',
+  storageKey: "product-store",
   serialize: (state) => JSON.stringify(state),
   deserialize: (json) => JSON.parse(json),
 });
@@ -1141,32 +1155,35 @@ interface SessionStoreConfig {
 }
 
 export const SessionStore = Store.for<SessionStoreConfig>()
-  .mirror(CustomerStore, 'CUSTOMERS')
-  .mirror(OrderStore, 'ORDERS')
+  .mirror(CustomerStore, "CUSTOMERS")
+  .mirror(OrderStore, "ORDERS")
   .build();
 ```
 
 **Fluent chaining:**
 
 ```typescript
-export const SessionStore = Store
-  .resource('CUSTOMERS').as<Customer[]>()
-  .resource('ORDERS').as<Order[]>()
-  .mirror(CustomerStore, 'CUSTOMERS')
-  .mirror(OrderStore, 'ORDERS')
+export const SessionStore = Store.resource("CUSTOMERS")
+  .as<Customer[]>()
+  .resource("ORDERS")
+  .as<Order[]>()
+  .mirror(CustomerStore, "CUSTOMERS")
+  .mirror(OrderStore, "ORDERS")
   .build();
 ```
 
 **Enum-constrained:**
 
 ```typescript
-const SessionEnum = { CUSTOMERS: 'CUSTOMERS', ORDERS: 'ORDERS' } as const;
+const SessionEnum = { CUSTOMERS: "CUSTOMERS", ORDERS: "ORDERS" } as const;
 
 export const SessionStore = Store.for(SessionEnum)
-  .resource('CUSTOMERS').as<Customer[]>()
-  .resource('ORDERS').as<Order[]>()
-  .mirror(CustomerStore, 'CUSTOMERS')
-  .mirror(OrderStore, 'ORDERS')
+  .resource("CUSTOMERS")
+  .as<Customer[]>()
+  .resource("ORDERS")
+  .as<Order[]>()
+  .mirror(CustomerStore, "CUSTOMERS")
+  .mirror(OrderStore, "ORDERS")
   .build();
 ```
 
@@ -1174,7 +1191,7 @@ export const SessionStore = Store.for(SessionEnum)
 
 ```typescript
 export const SessionStore = Store.for<{ ARTICLES: Item[] }>()
-  .mirror(ItemStore, 'ITEMS', 'ARTICLES')
+  .mirror(ItemStore, "ITEMS", "ARTICLES")
   .build();
 ```
 
@@ -1191,7 +1208,7 @@ interface SessionStoreConfig {
 }
 
 export const SessionStore = Store.for<SessionStoreConfig>()
-  .mirrorSelf('CUSTOMER_DETAILS', 'CUSTOMER_SNAPSHOT')
+  .mirrorSelf("CUSTOMER_DETAILS", "CUSTOMER_SNAPSHOT")
   .build();
 ```
 
@@ -1212,8 +1229,8 @@ interface SessionStoreConfig {
 export const CustomerStore = Store.for<CustomerStoreConfig>().build();
 
 export const SessionStore = Store.for<SessionStoreConfig>()
-  .mirror(CustomerStore, 'CUSTOMERS')
-  .mirrorSelf('CUSTOMERS', 'CUSTOMER_COPY')
+  .mirror(CustomerStore, "CUSTOMERS")
+  .mirrorSelf("CUSTOMERS", "CUSTOMER_COPY")
   .build();
 ```
 
@@ -1241,38 +1258,59 @@ interface SessionStoreConfig {
 }
 
 export const SessionStore = Store.for<SessionStoreConfig>()
-  .mirror(CustomerStore, 'CUSTOMERS')
-  .mirrorKeyed(CustomerStore, 'CUSTOMER_DETAILS', {
-    extractId: (data) => data?.id,
-  }, 'CUSTOMER_CACHE')
+  .mirror(CustomerStore, "CUSTOMERS")
+  .mirrorKeyed(
+    CustomerStore,
+    "CUSTOMER_DETAILS",
+    {
+      extractId: (data) => data?.id,
+    },
+    "CUSTOMER_CACHE",
+  )
   .build();
 ```
 
 **Fluent chaining:**
 
 ```typescript
-export const SessionStore = Store
-  .resource('CUSTOMERS').as<Customer[]>()
-  .resource('CUSTOMER_CACHE').as<KeyedResourceData<string, Customer>>()
-  .mirror(CustomerStore, 'CUSTOMERS')
-  .mirrorKeyed(CustomerStore, 'CUSTOMER_DETAILS', {
-    extractId: (data) => data?.id,
-  }, 'CUSTOMER_CACHE')
+export const SessionStore = Store.resource("CUSTOMERS")
+  .as<Customer[]>()
+  .resource("CUSTOMER_CACHE")
+  .as<KeyedResourceData<string, Customer>>()
+  .mirror(CustomerStore, "CUSTOMERS")
+  .mirrorKeyed(
+    CustomerStore,
+    "CUSTOMER_DETAILS",
+    {
+      extractId: (data) => data?.id,
+    },
+    "CUSTOMER_CACHE",
+  )
   .build();
 ```
 
 **Enum-constrained:**
 
 ```typescript
-const SessionEnum = { CUSTOMERS: 'CUSTOMERS', CUSTOMER_CACHE: 'CUSTOMER_CACHE' } as const;
+const SessionEnum = {
+  CUSTOMERS: "CUSTOMERS",
+  CUSTOMER_CACHE: "CUSTOMER_CACHE",
+} as const;
 
 export const SessionStore = Store.for(SessionEnum)
-  .resource('CUSTOMERS').as<Customer[]>()
-  .resource('CUSTOMER_CACHE').as<KeyedResourceData<string, Customer>>()
-  .mirror(CustomerStore, 'CUSTOMERS')
-  .mirrorKeyed(CustomerStore, 'CUSTOMER_DETAILS', {
-    extractId: (data) => data?.id,
-  }, 'CUSTOMER_CACHE')
+  .resource("CUSTOMERS")
+  .as<Customer[]>()
+  .resource("CUSTOMER_CACHE")
+  .as<KeyedResourceData<string, Customer>>()
+  .mirror(CustomerStore, "CUSTOMERS")
+  .mirrorKeyed(
+    CustomerStore,
+    "CUSTOMER_DETAILS",
+    {
+      extractId: (data) => data?.id,
+    },
+    "CUSTOMER_CACHE",
+  )
   .build();
 ```
 
@@ -1282,7 +1320,7 @@ export const SessionStore = Store.for(SessionEnum)
 export const SessionStore = Store.for<{
   CUSTOMER_DETAILS: KeyedResourceData<string, Customer>;
 }>()
-  .mirrorKeyed(CustomerStore, 'CUSTOMER_DETAILS', {
+  .mirrorKeyed(CustomerStore, "CUSTOMER_DETAILS", {
     extractId: (data) => data?.id,
   })
   .build();
@@ -1314,18 +1352,18 @@ You wire it once. Every future update — data, loading, errors — flows automa
 
 ```typescript
 // Same key on both stores (default)
-mirrorKey(customersStore, 'CUSTOMERS', sessionStore);
+mirrorKey(customersStore, "CUSTOMERS", sessionStore);
 
 // Different keys
-mirrorKey(customersStore, 'ITEMS', sessionStore, 'ARTICLES');
+mirrorKey(customersStore, "ITEMS", sessionStore, "ARTICLES");
 
 // Manual cleanup
-const cleanup = mirrorKey(customersStore, 'CUSTOMERS', sessionStore);
+const cleanup = mirrorKey(customersStore, "CUSTOMERS", sessionStore);
 cleanup(); // stop mirroring
 
 // Auto-cleanup with Angular DestroyRef
-mirrorKey(customersStore, 'CUSTOMERS', sessionStore, { destroyRef });
-mirrorKey(customersStore, 'ITEMS', sessionStore, 'ARTICLES', { destroyRef });
+mirrorKey(customersStore, "CUSTOMERS", sessionStore, { destroyRef });
+mirrorKey(customersStore, "ITEMS", sessionStore, "ARTICLES", { destroyRef });
 ```
 
 **Full example — session store that aggregates feature stores:**
@@ -1333,19 +1371,23 @@ mirrorKey(customersStore, 'ITEMS', sessionStore, 'ARTICLES', { destroyRef });
 For simple aggregation, prefer the [builder `.mirror()` approach](#builder-mirror). Use `mirrorKey` when you need imperative control — e.g. conditional mirroring, late setup, or `DestroyRef`-based cleanup:
 
 ```typescript
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class SessionStore {
   private readonly customerStore = inject(CustomerStore);
   private readonly orderStore = inject(OrderStore);
   private readonly store = inject(Store.for<SessionStoreConfig>().build());
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly customers = this.store.get('CUSTOMERS');
-  readonly orders = this.store.get('ORDERS');
+  readonly customers = this.store.get("CUSTOMERS");
+  readonly orders = this.store.get("ORDERS");
 
   constructor() {
-    mirrorKey(this.customerStore, 'CUSTOMERS', this.store, { destroyRef: this.destroyRef });
-    mirrorKey(this.orderStore, 'ORDERS', this.store, { destroyRef: this.destroyRef });
+    mirrorKey(this.customerStore, "CUSTOMERS", this.store, {
+      destroyRef: this.destroyRef,
+    });
+    mirrorKey(this.orderStore, "ORDERS", this.store, {
+      destroyRef: this.destroyRef,
+    });
   }
 }
 ```
@@ -1385,26 +1427,32 @@ Each entity is tracked independently — its own loading flag, status, and error
 
 ```typescript
 // Same key on both stores
-collectKeyed(customerStore, 'CUSTOMER_DETAILS', sessionStore, {
+collectKeyed(customerStore, "CUSTOMER_DETAILS", sessionStore, {
   extractId: (data) => data?.id,
   destroyRef,
 });
 
 // Different keys
-collectKeyed(customerStore, 'CUSTOMER_DETAILS', sessionStore, 'CUSTOMER_CACHE', {
-  extractId: (data) => data?.id,
-  destroyRef,
-});
+collectKeyed(
+  customerStore,
+  "CUSTOMER_DETAILS",
+  sessionStore,
+  "CUSTOMER_CACHE",
+  {
+    extractId: (data) => data?.id,
+    destroyRef,
+  },
+);
 ```
 
 **What it does on each source update:**
 
-| Source state | Action |
-|---|---|
-| `status: 'Success'` + valid ID | Merges entity into target's keyed data |
-| `status: 'Error'` + valid ID | Records per-key error and status |
-| `isLoading: true` + valid ID | Sets per-key loading flag |
-| Data cleared (e.g. `source.clear()`) | Removes previous entity from target |
+| Source state                         | Action                                 |
+| ------------------------------------ | -------------------------------------- |
+| `status: 'Success'` + valid ID       | Merges entity into target's keyed data |
+| `status: 'Error'` + valid ID         | Records per-key error and status       |
+| `isLoading: true` + valid ID         | Sets per-key loading flag              |
+| Data cleared (e.g. `source.clear()`) | Removes previous entity from target    |
 
 **Full example — collect individual customer lookups into a cache:**
 
@@ -1420,19 +1468,25 @@ interface SessionStoreConfig {
   CUSTOMER_CACHE: KeyedResourceData<string, Customer>;
 }
 
-@Injectable({ providedIn: 'root' })
+@Injectable({ providedIn: "root" })
 export class SessionStore {
   private readonly customerStore = inject(CustomerStore);
   private readonly store = inject(Store.for<SessionStoreConfig>().build());
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly customerCache = this.store.get('CUSTOMER_CACHE');
+  readonly customerCache = this.store.get("CUSTOMER_CACHE");
 
   constructor() {
-    collectKeyed(this.customerStore, 'CUSTOMER_DETAILS', this.store, 'CUSTOMER_CACHE', {
-      extractId: (data) => data?.id,
-      destroyRef: this.destroyRef,
-    });
+    collectKeyed(
+      this.customerStore,
+      "CUSTOMER_DETAILS",
+      this.store,
+      "CUSTOMER_CACHE",
+      {
+        extractId: (data) => data?.id,
+        destroyRef: this.destroyRef,
+      },
+    );
   }
 
   // After loading customers "c1" and "c2", the cache contains:
@@ -1444,6 +1498,51 @@ export class SessionStore {
   // }
 }
 ```
+
+---
+
+## AI Coding
+
+flurryx ships a [`skills/flurryx/SKILL.md`](skills/flurryx/SKILL.md) that teaches AI coding assistants (Claude Code, Cursor, Windsurf, Copilot, etc.) the library's patterns and conventions. Point your tool to it and every generated store, facade, and decorator will follow the correct structure from the start.
+
+### Set Up
+
+**Claude Code / OpenCode** — add to `AGENTS.md` or `.claude/CLAUDE.md`:
+
+```markdown
+- When generating Angular state management code, follow the patterns in skills/flurryx/SKILL.md
+```
+
+**Cursor** — add to `.cursorrules`:
+
+```
+When generating flurryx code, follow the patterns and rules described in skills/flurryx/SKILL.md
+```
+
+**Windsurf** — add to `.windsurfrules`:
+
+```
+When generating flurryx code, follow the patterns and rules described in skills/flurryx/SKILL.md
+```
+
+**GitHub Copilot** — reference in `.github/copilot-instructions.md`:
+
+```markdown
+- Follow the conventions documented in skills/flurryx/SKILL.md for flurryx state management code
+```
+
+### What It Covers
+
+- Store definition (interface-based, fluent, enum-constrained)
+- Facade creation with `@SkipIfCached` / `@Loading` decorators
+- Component patterns (read signals, never subscribe manually)
+- Keyed resources for per-entity caching
+- Store mirroring (`mirror`, `mirrorSelf`, `mirrorKeyed`)
+- Message channels and persistence
+- Time travel, replay, and dead-letter recovery
+- Error normalization (default, HTTP, custom)
+- Anti-patterns to avoid (no `any`, no direct store writes from components, decorator ordering)
+- Directory structure conventions
 
 ---
 

@@ -35,7 +35,7 @@ interface StoreSignals {
   readonly currentIndex: import('@angular/core').Signal<number>;
   undo(): boolean;
   redo(): boolean;
-  travelTo(index: number): void;
+  restoreStoreAt(index: number): void;
   replay(id: number): number;
 }
 
@@ -104,8 +104,8 @@ export class StoreActivityPanelComponent {
     this.activeStore().redo();
   }
 
-  protected travelTo(index: number): void {
-    this.activeStore().travelTo(index);
+  protected restoreAt(index: number): void {
+    this.activeStore().restoreStoreAt(index);
   }
 
   protected replay(messageId: number): void {

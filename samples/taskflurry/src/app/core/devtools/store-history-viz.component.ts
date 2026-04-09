@@ -22,8 +22,8 @@ interface HistoryEntry {
 export interface HistoryVizStore {
   readonly history: Signal<readonly HistoryEntry[]>;
   readonly currentIndex: Signal<number>;
-  travelTo(index: number): void;
-  travelToKey(key: string, index?: number): void;
+  restoreStoreAt(index: number): void;
+  restoreResource(key: string, index?: number): void;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -72,13 +72,13 @@ export class StoreHistoryVizComponent {
     this.showHistory.update((v) => !v);
   }
 
-  protected travelTo(index: number): void {
+  protected restoreAt(index: number): void {
     const store = this.store();
     const key = this.filterKey();
     if (key) {
-      store.travelToKey(key, index);
+      store.restoreResource(key, index);
     } else {
-      store.travelTo(index);
+      store.restoreStoreAt(index);
     }
   }
 

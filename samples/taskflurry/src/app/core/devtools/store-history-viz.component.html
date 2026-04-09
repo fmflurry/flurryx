@@ -18,7 +18,7 @@
         [class.shv-entry--current]="entry.index === currentIndex()"
         [class.shv-entry--past]="entry.index < currentIndex()"
         [class.shv-entry--future]="entry.index > currentIndex()"
-        (click)="travelTo(entry.index)"
+        (click)="restoreAt(entry.index)"
       >
         <div class="shv-entry__track">
           <span class="shv-entry__dot"></span>

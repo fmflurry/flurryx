@@ -1503,46 +1503,45 @@ export class SessionStore {
 
 ## AI Coding
 
-flurryx ships a [`skills/flurryx/SKILL.md`](skills/flurryx/SKILL.md) that teaches AI coding assistants (Claude Code, Cursor, Windsurf, Copilot, etc.) the library's patterns and conventions. Point your tool to it and every generated store, facade, and decorator will follow the correct structure from the start.
+flurryx ships a [`skills/flurryx/SKILL.md`](skills/flurryx/SKILL.md) file that teaches AI coding assistants the library's patterns and conventions. When loaded through a skill-aware harness, it helps generated stores, facades, services, and decorators follow flurryx conventions from the start.
 
 ### Set Up
 
-**Claude Code / OpenCode** — add to `AGENTS.md` or `.claude/CLAUDE.md`:
+For harnesses that support skill loading, install the skill using this directory layout:
 
-```markdown
-- When generating Angular state management code, follow the patterns in skills/flurryx/SKILL.md
+```text
+skills/
+  flurryx/
+    SKILL.md
 ```
 
-**Cursor** — add to `.cursorrules`:
+- The harness should load the skill from `skills/flurryx/SKILL.md`
+- Do not copy the skill instructions into `AGENTS.md`, `.claude/CLAUDE.md`, or similar agent prompt files
+- Keep the skill as a dedicated loader entry so it remains reusable and versionable
 
-```
-When generating flurryx code, follow the patterns and rules described in skills/flurryx/SKILL.md
-```
+If your tool is not skill-aware, you can still point it at `skills/flurryx/SKILL.md` as reference documentation.
 
-**Windsurf** — add to `.windsurfrules`:
+### Why Use the Skill Loader
 
-```
-When generating flurryx code, follow the patterns and rules described in skills/flurryx/SKILL.md
-```
-
-**GitHub Copilot** — reference in `.github/copilot-instructions.md`:
-
-```markdown
-- Follow the conventions documented in skills/flurryx/SKILL.md for flurryx state management code
-```
+- Keeps flurryx guidance in one dedicated file
+- Avoids bloating generic agent instruction files
+- Makes the library conventions easy to install, update, and reuse across projects
+- Preserves the harness-native loading model instead of relying on ad hoc prompt wiring
 
 ### What It Covers
 
 - Store definition (interface-based, fluent, enum-constrained)
-- Facade creation with `@SkipIfCached` / `@Loading` decorators
+- Architecture-agnostic orchestration guidance
+- Facade and service-led patterns
+- `@SkipIfCached` usage rules and decorator ordering with `@Loading`
 - Component patterns (read signals, never subscribe manually)
 - Keyed resources for per-entity caching
 - Store mirroring (`mirror`, `mirrorSelf`, `mirrorKeyed`)
 - Message channels and persistence
 - Time travel, replay, and dead-letter recovery
 - Error normalization (default, HTTP, custom)
-- Anti-patterns to avoid (no `any`, no direct store writes from components, decorator ordering)
-- Directory structure conventions
+- Anti-patterns to avoid (no `any`, avoid accidental caching, decorator ordering)
+
 
 ---
 

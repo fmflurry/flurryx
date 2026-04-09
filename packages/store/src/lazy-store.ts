@@ -43,8 +43,12 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   private readonly historyDriver: StoreHistoryDriver<TData>;
 
   /** @inheritDoc */
-  readonly travelTo = (index: number): void =>
-    this.historyDriver.travelTo(index);
+  readonly restoreStoreAt = (index: number): void =>
+    this.historyDriver.restoreStoreAt(index);
+
+  /** @inheritDoc */
+  readonly restoreResource = <K extends StoreKey<TData>>(key: K, index?: number): void =>
+    this.historyDriver.restoreResource(key, index);
 
   /** @inheritDoc */
   readonly undo = (): boolean => this.historyDriver.undo();
@@ -144,6 +148,8 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     this.historyDriver = createStoreHistory<TData>({
       captureSnapshot: () => consumer.createSnapshot(),
       applySnapshot: (snapshot) => consumer.applySnapshot(snapshot),
+      applyKeyUpdate: (key, snapshotState) => consumer.applyKeyUpdate(key, snapshotState),
+      getAllKeys: () => this.signals.keys() as Iterable<StoreKey<TData>>,
       applyMessage: (message) => consumer.applyMessage(message),
       channel: options?.channel,
     });

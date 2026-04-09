@@ -23,6 +23,7 @@ export interface HistoryVizStore {
   readonly history: Signal<readonly HistoryEntry[]>;
   readonly currentIndex: Signal<number>;
   travelTo(index: number): void;
+  travelToKey(key: string, index?: number): void;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -72,7 +73,13 @@ export class StoreHistoryVizComponent {
   }
 
   protected travelTo(index: number): void {
-    this.store().travelTo(index);
+    const store = this.store();
+    const key = this.filterKey();
+    if (key) {
+      store.travelToKey(key, index);
+    } else {
+      store.travelTo(index);
+    }
   }
 
   protected entryLabel(entry: HistoryEntry): string {

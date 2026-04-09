@@ -104,7 +104,7 @@ describe("built-in store broker history", () => {
       .map((entry) => entry.id)
       .filter((id): id is number => id !== null);
 
-    store.travelTo(0);
+    store.restoreStoreAt(0);
 
     const acknowledged = store.replay(replayIds);
 
@@ -147,7 +147,7 @@ describe("built-in store broker history", () => {
 
     const messageId = store.getHistory()[1]!.id;
 
-    store.travelTo(0);
+    store.restoreStoreAt(0);
     expect(store.get(ReplayStoreEnum.COUNTER)().data).toBeUndefined();
     expect(store.get(ReplayStoreEnum.MESSAGE)().data).toBeUndefined();
 
@@ -185,7 +185,7 @@ describe("built-in store broker history", () => {
     const counterHistory = store.getHistory(ReplayStoreEnum.COUNTER);
     const lastCounterMessageId = counterHistory.at(-1)?.id;
 
-    store.travelTo(0);
+    store.restoreStoreAt(0);
     expect(store.replay(lastCounterMessageId!)).toBe(1);
 
     expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(2);
@@ -205,7 +205,7 @@ describe("built-in store broker history", () => {
       .map((entry) => entry.id)
       .filter((id): id is number => id !== null);
 
-    store.travelTo(0);
+    store.restoreStoreAt(0);
 
     expect(store.replay(replayIds)).toBe(2);
 
@@ -230,7 +230,7 @@ describe("built-in store broker history", () => {
     expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(2);
     expect(store.getCurrentIndex()).toBe(2);
 
-    store.travelTo(0);
+    store.restoreStoreAt(0);
     expect(store.get(ReplayStoreEnum.COUNTER)().data).toBeUndefined();
     expect(store.undo()).toBe(false);
   });
@@ -288,7 +288,7 @@ describe("built-in store broker history", () => {
 
     const firstMessageId = store.getHistory()[1]!.id;
 
-    store.travelTo(1);
+    store.restoreStoreAt(1);
     expect(store.replay(firstMessageId!)).toBe(1);
 
     expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(1);
@@ -394,7 +394,7 @@ describe("built-in store broker history", () => {
     expect(secondStore.getMessages()[0]?.id).toBe(persistedRecordId);
     expect(secondStore.getMessages()[0]?.status).toBe("acknowledged");
 
-    secondStore.travelTo(0);
+    secondStore.restoreStoreAt(0);
     expect(secondStore.replay(persistedRecordId!)).toBe(1);
     expect(secondStore.get(ReplayStoreEnum.COUNTER)().data).toBe(3);
   });
@@ -421,7 +421,7 @@ describe("built-in store broker history", () => {
       status: "Success",
     });
 
-    firstStore.travelTo(0);
+    firstStore.restoreStoreAt(0);
 
     const syncedMessages = firstStore.messages();
 
@@ -501,7 +501,7 @@ describe("built-in store broker history", () => {
     storedData?.lookup.set("version", 99);
     storedData?.tags.add("mutated-after-replay");
 
-    store.travelTo(0);
+    store.restoreStoreAt(0);
     expect(store.replay(messageId!)).toBe(1);
 
     const replayedData = store.get(ReplayStoreEnum.META)().data;
@@ -528,7 +528,7 @@ describe("built-in store broker history", () => {
       .map((entry) => entry.id)
       .filter((id): id is number => id !== null);
 
-    store.travelTo(1);
+    store.restoreStoreAt(1);
 
     let keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)().data;
     expect(keyedData?.entities["m-1"]).toEqual({ id: "m-1", text: "hello" });
@@ -542,7 +542,7 @@ describe("built-in store broker history", () => {
     keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)().data;
     expect(keyedData?.isLoading["m-2"]).toBeUndefined();
 
-    store.travelTo(0);
+    store.restoreStoreAt(0);
     expect(store.get(ReplayStoreEnum.KEYED_MESSAGES)().data).toBeUndefined();
 
     expect(store.replay(replayIds)).toBe(2);
@@ -568,7 +568,7 @@ describe("built-in store broker history", () => {
     store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
 
     updates.length = 0;
-    store.travelTo(0);
+    store.restoreStoreAt(0);
 
     expect(updates).toEqual([
       {
@@ -592,7 +592,7 @@ describe("built-in store broker history", () => {
       status: "Success",
       revision: 2,
     });
-    store.travelTo(1);
+    store.restoreStoreAt(1);
 
     const restoredState = store.get(ReplayStoreEnum.COUNTER)();
 
@@ -613,13 +613,416 @@ describe("built-in store broker history", () => {
     expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(2);
   });
 
+  describe("restoreResource", () => {
+    it("restores a single key to its state at the current history index", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+      store.update(ReplayStoreEnum.MESSAGE, {
+        data: { text: "hello", version: 1 },
+        status: "Success",
+      });
+
+      // At index 3, COUNTER has data: 2, MESSAGE has data: { text: "hello", version: 1 }
+      // At index 1, COUNTER has data: 1, MESSAGE is undefined
+      // Stay at index 3 and restore just COUNTER to its index 1 state
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+
+      // COUNTER should be at state from index 1 (data: 1)
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(1);
+      // MESSAGE should remain unaffected (still at index 3 state)
+      expect(store.get(ReplayStoreEnum.MESSAGE)().data).toEqual({
+        text: "hello",
+        version: 1,
+      });
+    });
+
+    it("restores a single key to its state at a specific history index", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+      store.update(ReplayStoreEnum.MESSAGE, {
+        data: { text: "hello", version: 1 },
+        status: "Success",
+      });
+
+      // At index 3: COUNTER has data: 2, MESSAGE has data: { text: "hello", version: 1 }
+      // At index 1: COUNTER has data: 1, MESSAGE is undefined
+      // At index 0: Both are undefined
+
+      // Use restoreResource to restore COUNTER to index 1 state while at index 3
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+
+      // COUNTER should be at state from index 1 (data: 1)
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(1);
+      // MESSAGE should remain unaffected (still at index 3 state)
+      expect(store.get(ReplayStoreEnum.MESSAGE)().data).toEqual({
+        text: "hello",
+        version: 1,
+      });
+    });
+
+    it("only restores the specified key and leaves other keys unaffected", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 5, status: "Success" });
+      store.update(ReplayStoreEnum.MESSAGE, {
+        data: { text: "original", version: 1 },
+        status: "Success",
+      });
+      store.update(ReplayStoreEnum.COUNTER, { data: 10, status: "Success" });
+      store.update(ReplayStoreEnum.MESSAGE, {
+        data: { text: "modified", version: 2 },
+        status: "Success",
+      });
+
+      // At index 4: COUNTER has data: 10, MESSAGE has data: { text: "modified", version: 2 }
+      // At index 1: COUNTER has data: 5, MESSAGE is undefined
+
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+
+      // COUNTER should be at index 1 state (data: 5)
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(5);
+      // MESSAGE should remain at index 4 state (not affected)
+      expect(store.get(ReplayStoreEnum.MESSAGE)().data).toEqual({
+        text: "modified",
+        version: 2,
+      });
+    });
+
+    it("calls update hook only for the restored key", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+      store.update(ReplayStoreEnum.MESSAGE, {
+        data: { text: "hello", version: 1 },
+        status: "Success",
+      });
+
+      const counterUpdates: Array<{
+        nextData: number | undefined;
+        previousData: number | undefined;
+      }> = [];
+      const messageUpdates: Array<{
+        nextData: { text: string; version: number } | undefined;
+        previousData: { text: string; version: number } | undefined;
+      }> = [];
+
+      store.onUpdate(ReplayStoreEnum.COUNTER, (nextState, previousState) => {
+        counterUpdates.push({
+          nextData: nextState.data,
+          previousData: previousState.data,
+        });
+      });
+      store.onUpdate(ReplayStoreEnum.MESSAGE, (nextState, previousState) => {
+        messageUpdates.push({
+          nextData: nextState.data,
+          previousData: previousState.data,
+        });
+      });
+
+      // At index 3, restore just COUNTER to its index 1 state (data: 1)
+      // Current state is { data: 2 }, target state is { data: 1 }
+      counterUpdates.length = 0;
+      messageUpdates.length = 0;
+
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+
+      // COUNTER should have received an update notification (from 2 to 1)
+      expect(counterUpdates).toHaveLength(1);
+      expect(counterUpdates[0]).toEqual({
+        nextData: 1,
+        previousData: 2,
+      });
+      // MESSAGE should NOT have received any update
+      expect(messageUpdates).toHaveLength(0);
+    });
+
+    it("does not create a new history entry when restoring a key", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+
+      const initialHistoryLength = store.getHistory().length;
+      const initialIndex = store.getCurrentIndex();
+
+      store.restoreResource(ReplayStoreEnum.COUNTER, 0);
+
+      // History should not grow
+      expect(store.getHistory()).toHaveLength(initialHistoryLength);
+      // Current index should not change
+      expect(store.getCurrentIndex()).toBe(initialIndex);
+    });
+
+    it("throws when traveling to an invalid history index", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, -1)).toThrow(
+        "History index is out of range"
+      );
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, 999)).toThrow(
+        "History index is out of range"
+      );
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, Number.NaN)).toThrow(
+        "History index is out of range"
+      );
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, 0.5)).toThrow(
+        "History index is out of range"
+      );
+    });
+
+    it("throws when traveling to an invalid store key", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+
+      // @ts-expect-error Testing with invalid key at runtime
+      expect(() => store.restoreResource("INVALID_KEY")).toThrow("Invalid store key");
+    });
+
+    it("works with keyed store data", () => {
+      store.updateKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1", {
+        id: "m-1",
+        text: "first",
+      });
+      store.updateKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-2", {
+        id: "m-2",
+        text: "second",
+      });
+      store.updateKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1", {
+        id: "m-1",
+        text: "first-updated",
+      });
+
+      // At index 3: KEYED_MESSAGES has m-1 (updated) and m-2
+      // At index 1: KEYED_MESSAGES has only m-1 (original)
+
+      store.restoreResource(ReplayStoreEnum.KEYED_MESSAGES, 1);
+
+      const keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)()
+        .data as KeyedResourceData<string, { id: string; text: string }>;
+
+      // Should only have m-1 from index 1
+      expect(Object.keys(keyedData.entities)).toEqual(["m-1"]);
+      expect(keyedData.entities["m-1"]?.text).toBe("first");
+      // m-2 should not exist
+      expect(keyedData.entities["m-2"]).toBeUndefined();
+    });
+
+    it("restores custom resource-state fields for the key", () => {
+      store.update(ReplayStoreEnum.COUNTER, {
+        data: 1,
+        status: "Success",
+        revision: 1,
+      });
+      store.update(ReplayStoreEnum.COUNTER, {
+        data: 2,
+        status: "Success",
+        revision: 2,
+      });
+      store.update(ReplayStoreEnum.COUNTER, {
+        data: 3,
+        status: "Success",
+        revision: 3,
+      });
+
+      // At index 3: revision is 3
+      // At index 1: revision is 1
+
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+
+      const restoredState = store.get(ReplayStoreEnum.COUNTER)();
+
+      expect(restoredState.data).toBe(1);
+      expect(restoredState.revision).toBe(1);
+      expect(restoredState.status).toBe("Success");
+    });
+
+    it("restores to index 0 when history only has initial entry", () => {
+      // At index 0, COUNTER is undefined
+      store.restoreResource(ReplayStoreEnum.COUNTER, 0);
+
+      const restoredState = store.get(ReplayStoreEnum.COUNTER)();
+      // Should use createDefaultState() since snapshotState is undefined
+      // createDefaultState returns { data: undefined, isLoading: false, status: undefined }
+      expect(restoredState.data).toBeUndefined();
+      expect(restoredState.isLoading).toBe(false);
+    });
+
+    it("uses currentIndex when index is not provided", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 3, status: "Success" });
+
+      // At index 3, restore just COUNTER to its index 2 state (data: 2)
+      // Since no index is provided, should use currentIndex (3)
+      // But restoreResource should still use the provided index or currentIndex for snapshot lookup
+      // So without explicit index, it restores to currentIndex's state
+      store.restoreResource(ReplayStoreEnum.COUNTER);
+
+      // currentIndex is 3, which has data: 3, so nothing changes
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(3);
+    });
+
+    it("restores a key that was never updated in history (uses default state)", () => {
+      // Only update COUNTER, not MESSAGE
+      store.update(ReplayStoreEnum.COUNTER, { data: 5, status: "Success" });
+
+      // At index 0: MESSAGE is undefined (never updated)
+      // At index 1: COUNTER has data: 5, MESSAGE is still undefined
+
+      // Restore MESSAGE to index 0 - should get default state since it was never set
+      store.restoreResource(ReplayStoreEnum.MESSAGE, 0);
+
+      const restoredState = store.get(ReplayStoreEnum.MESSAGE)();
+      // Should use createDefaultState() for MESSAGE
+      // createDefaultState returns { data: undefined, isLoading: false, status: undefined }
+      expect(restoredState.data).toBeUndefined();
+      expect(restoredState.status).toBeUndefined();
+      expect(restoredState.isLoading).toBe(false);
+    });
+
+    it("handles consecutive restores to different indices", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 3, status: "Success" });
+
+      // Restore to index 1
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(1);
+
+      // Then restore to index 2
+      store.restoreResource(ReplayStoreEnum.COUNTER, 2);
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(2);
+
+      // Then restore to index 0 - index 0 has undefined (initial state)
+      store.restoreResource(ReplayStoreEnum.COUNTER, 0);
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBeUndefined();
+    });
+
+    it("handles multiple restores to the same index", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+
+      // Multiple restores to same index should be idempotent
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(1);
+
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(1);
+
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+      expect(store.get(ReplayStoreEnum.COUNTER)().data).toBe(1);
+    });
+
+    it("notifies listeners after restore via onUpdate", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+
+      let updateCallCount = 0;
+      store.onUpdate(ReplayStoreEnum.COUNTER, () => {
+        updateCallCount++;
+      });
+
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+
+      expect(updateCallCount).toBe(1);
+    });
+
+    it("throws when restoring with Infinity index", () => {
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, Infinity)).toThrow(
+        "History index is out of range"
+      );
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, -Infinity)).toThrow(
+        "History index is out of range"
+      );
+    });
+
+    it("throws when restoring with Number.POSITIVE_INFINITY", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, Number.POSITIVE_INFINITY)).toThrow(
+        "History index is out of range"
+      );
+    });
+
+    it("throws when restoring with Number.NEGATIVE_INFINITY", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, Number.NEGATIVE_INFINITY)).toThrow(
+        "History index is out of range"
+      );
+    });
+
+    it("throws when restoring with max safe integer", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      expect(() => store.restoreResource(ReplayStoreEnum.COUNTER, Number.MAX_SAFE_INTEGER)).toThrow(
+        "History index is out of range"
+      );
+    });
+
+    it("restores does not affect currentIndex", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 3, status: "Success" });
+
+      expect(store.getCurrentIndex()).toBe(3);
+
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+
+      // currentIndex should NOT change
+      expect(store.getCurrentIndex()).toBe(3);
+    });
+
+    it("restores keyed resource to undefined state when not present at target index", () => {
+      // Start with keyed messages
+      store.updateKeyedOne(ReplayStoreEnum.KEYED_MESSAGES, "m-1", {
+        id: "m-1",
+        text: "first",
+      });
+
+      // At index 2: KEYED_MESSAGES has m-1
+      // At index 0: KEYED_MESSAGES is undefined (never set)
+
+      // Restore KEYED_MESSAGES to index 0
+      // Current behavior: uses createDefaultState() which sets data to undefined
+      // This is a known limitation - keyed resources should use createKeyedResourceData()
+      store.restoreResource(ReplayStoreEnum.KEYED_MESSAGES, 0);
+
+      const state = store.get(ReplayStoreEnum.KEYED_MESSAGES)();
+      // Note: data becomes undefined instead of empty KeyedResourceData
+      expect(state.data).toBeUndefined();
+    });
+
+    it("update hook receives correct previous state when restoring", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      store.update(ReplayStoreEnum.COUNTER, { data: 2, status: "Success" });
+
+      let capturedPrevious: number | undefined;
+      let capturedNext: number | undefined;
+
+      store.onUpdate(ReplayStoreEnum.COUNTER, (next, previous) => {
+        capturedPrevious = previous.data;
+        capturedNext = next.data;
+      });
+
+      // Current state is 2, restoring to index 1 where state was 1
+      store.restoreResource(ReplayStoreEnum.COUNTER, 1);
+
+      expect(capturedPrevious).toBe(2);
+      expect(capturedNext).toBe(1);
+    });
+
+    it("throws on null key type", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      // @ts-expect-error Testing runtime null key
+      expect(() => store.restoreResource(null, 0)).toThrow("Invalid store key");
+    });
+
+    it("throws on undefined key type", () => {
+      store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
+      // @ts-expect-error Testing runtime undefined key
+      expect(() => store.restoreResource(undefined, 0)).toThrow("Invalid store key");
+    });
+  });
+
   it("throws when traveling outside history or replaying invalid ids", () => {
-    expect(() => store.travelTo(-1)).toThrow();
-    expect(() => store.travelTo(1)).toThrow();
-    expect(() => store.travelTo(Number.NaN)).toThrow(
+    expect(() => store.restoreStoreAt(-1)).toThrow();
+    expect(() => store.restoreStoreAt(1)).toThrow();
+    expect(() => store.restoreStoreAt(Number.NaN)).toThrow(
       "History index is out of range"
     );
-    expect(() => store.travelTo(0.5)).toThrow("History index is out of range");
+    expect(() => store.restoreStoreAt(0.5)).toThrow("History index is out of range");
 
     store.update(ReplayStoreEnum.COUNTER, { data: 1, status: "Success" });
     const validId = store.getHistory()[1]!.id;
@@ -703,10 +1106,10 @@ describe("built-in store broker integration", () => {
       .map((entry) => entry.id)
       .filter((id): id is number => id !== null);
 
-    store.travelTo(0);
+    store.restoreStoreAt(0);
     expect(store.replay(replayIds)).toBe(2);
 
-    store.travelTo(1);
+    store.restoreStoreAt(1);
     expect(store.get("MESSAGES")().data).toEqual(["hello", "world"]);
     expect(store.get("ACTIVE_MESSAGE")().data).toBeUndefined();
   });

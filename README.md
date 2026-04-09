@@ -104,7 +104,7 @@ loadProducts() { /* only runs on cache miss */ }
 ```typescript
 store.undo();
 store.redo();
-store.travelTo(0); // back to initial state
+store.restoreStoreAt(0); // back to initial state
 ```
 
 The store is the foundation. Layer on facades, decorators, mirroring, and message channels when your app needs them — not before.
@@ -171,7 +171,7 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 
 ### Message Broker
 - **Message queueing** — typed, immutable, traceable
-- **History & time travel** — undo, redo, travelTo
+- **History & time travel** — undo, redo, restoreStoreAt, restoreResource
 - **Replay** — re-execute messages by id
 - **Dead-letter recovery** — retry failed mutations
 - **Pluggable channels** — memory, localStorage, sessionStorage, composite
@@ -907,15 +907,21 @@ const listHistory = store.getHistory('LIST');
 const currentIndex = store.getCurrentIndex(); // 2
 
 // Jump to any recorded snapshot
-store.travelTo(0); // restore initial state
-store.travelTo(2); // jump back to latest
+store.restoreStoreAt(0); // restore initial state
+store.restoreStoreAt(2); // jump back to latest
+
+// Restore a single key without affecting others
+store.restoreResource('LIST', 0); // restore only LIST to its state at snapshot 0
+store.restoreResource('LIST');      // restore LIST to its state at the current index
 
 // Step-by-step navigation
 store.undo(); // move to previous snapshot — returns false if already at index 0
 store.redo(); // move to next snapshot — returns false if already at latest
 ```
 
-`travelTo`, `undo`, and `redo` restore snapshots only — they do **not** re-execute messages or create new history entries.
+`restoreStoreAt`, `undo`, and `redo` restore snapshots only — they do **not** re-execute messages or create new history entries.
+
+`restoreResource(key, index?)` restores a **single key** from a snapshot without affecting other keys. This is useful when viewing history filtered by key — you can restore `TASKS` to a previous state without losing `SELECTED_PROJECT`. Like `restoreStoreAt`, it does not create new history entries.
 
 ### Message Replay
 
@@ -941,12 +947,13 @@ store.replay([1, 2, 3]); // returns count of acknowledged messages
 
 **When to use replay vs. time travel:**
 
-| | `travelTo` / `undo` / `redo` | `replay` |
-|---|---|---|
-| Mechanism | Restores a snapshot | Re-executes message(s) through broker |
-| Creates new history | No | Yes |
-| Fires `onUpdate` hooks | Yes | Yes |
-| Use case | Inspecting past state, undo/redo UX | Deterministic state reconstruction, recovery |
+| | `restoreStoreAt` / `undo` / `redo` | `restoreResource` | `replay` |
+|---|---|---|---|
+| Mechanism | Restores full snapshot | Restores single key from snapshot | Re-executes message(s) through broker |
+| Affects other keys | Yes — entire store | No — only specified key | Depends on message |
+| Creates new history | No | No | Yes |
+| Fires `onUpdate` hooks | Yes | Yes (for restored key only) | Yes |
+| Use case | Inspecting past state, undo/redo UX | Key-scoped time travel, devtools history | Deterministic state reconstruction, recovery |
 
 ### Dead-Letter Recovery
 

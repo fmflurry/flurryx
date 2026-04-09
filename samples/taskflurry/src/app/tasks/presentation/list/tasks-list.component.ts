@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@a
 import { RouterLink } from '@angular/router';
 import { TasksFacade } from '../../application/facades/tasks.facade';
 import { TasksStore } from '../../application/store/tasks.store';
-import { StoreHistoryVizComponent } from '../../../core/devtools/store-history-viz.component';
+import { HistoryVizStore, StoreHistoryVizComponent } from '../../../core/devtools/store-history-viz.component';
 
 @Component({
   selector: 'app-tasks-list',
@@ -21,7 +21,7 @@ export class TasksListComponent implements OnInit {
   protected readonly hasError = computed(() => this.tasksState().status === 'Error');
   protected readonly errors = computed(() => this.tasksState().errors ?? []);
 
-  protected readonly historyStore = inject(TasksStore);
+  protected readonly historyStore = inject(TasksStore) as unknown as HistoryVizStore;
 
   ngOnInit(): void {
     this.facade.loadTasks();

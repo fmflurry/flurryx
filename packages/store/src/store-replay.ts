@@ -8,9 +8,11 @@ import type {
 import {
   INVALID_HISTORY_INDEX_ERROR,
   INVALID_HISTORY_MESSAGE_ID_ERROR,
+  INVALID_STORE_KEY_ERROR,
   MESSAGE_NOT_ACKNOWLEDGED_ERROR,
 } from "./store-messages";
 import { cloneValue } from "./store-clone";
+import { createDefaultState } from "./store-message-consumer";
 import {
   createInMemoryStoreMessageChannel,
   type StoreMessageChannel,
@@ -38,6 +40,7 @@ export type {
 export {
   INVALID_HISTORY_INDEX_ERROR,
   INVALID_HISTORY_MESSAGE_ID_ERROR,
+  INVALID_STORE_KEY_ERROR,
   MESSAGE_NOT_ACKNOWLEDGED_ERROR,
 } from "./store-messages";
 export {
@@ -73,7 +76,7 @@ export interface StoreHistoryEntry<
 > {
   /** Stable message id used by `replay(...)`; `null` for the initial snapshot entry. */
   readonly id: number | null;
-  /** Snapshot position used by `travelTo(index)`, `undo()`, and `redo()`. */
+  /** Snapshot position used by `restoreStoreAt(index)`, `undo()`, and `redo()`. */
   readonly index: number;
   /** Acknowledged message that produced this snapshot; `null` for the initial entry. */
   readonly message: StoreMessage<TData, TKey> | null;
@@ -106,7 +109,7 @@ export interface StoreDeadLetterEntry<
 /**
  * Public history and recovery API exposed on every store instance.
  *
- * `travelTo(...)` navigates snapshots by history index, while `replay(...)`
+ * `restoreStoreAt(...)` navigates snapshots by history index, while `replay(...)`
  * re-executes previously published channel messages by their stable message ids.
  */
 export interface StoreHistory<
@@ -144,12 +147,27 @@ export interface StoreHistory<
    *
    * @throws {Error} When the index is outside the recorded history range.
    */
-  travelTo(index: number): void;
+  restoreStoreAt(index: number): void;
+
+  /**
+   * Restores a single store key to its state at a specific history index.
+   *
+   * Unlike `restoreStoreAt(index)` which restores the full snapshot, this method
+   * only restores the specified key while leaving other keys unaffected.
+   * This is snapshot navigation only. It does not publish or acknowledge any
+   * message and does not create a new history entry.
+   *
+   * @param key - The store key to restore.
+   * @param index - Optional history index. Defaults to the current index.
+   * @throws {Error} When the key is not a valid store key.
+   * @throws {Error} When the index is outside the recorded history range.
+   */
+  restoreResource<K extends TKey>(key: K, index?: number): void;
 
   /**
    * Moves to the previous recorded snapshot.
    *
-   * Equivalent to `travelTo(getCurrentIndex() - 1)` when possible.
+   * Equivalent to `restoreStoreAt(getCurrentIndex() - 1)` when possible.
    *
    * @returns `true` when the pointer moved, otherwise `false` at the initial snapshot.
    */
@@ -158,7 +176,7 @@ export interface StoreHistory<
   /**
    * Moves to the next recorded snapshot when history exists ahead of the current pointer.
    *
-   * Equivalent to `travelTo(getCurrentIndex() + 1)` when possible.
+   * Equivalent to `restoreStoreAt(getCurrentIndex() + 1)` when possible.
    *
    * @returns `true` when the pointer moved, otherwise `false` at the latest snapshot.
    */
@@ -227,6 +245,8 @@ interface CreateStoreHistoryConfig<
 > {
   readonly captureSnapshot: () => StoreSnapshot<TData, TKey>;
   readonly applySnapshot: (snapshot: StoreSnapshot<TData, TKey>) => void;
+  readonly applyKeyUpdate: <K extends TKey>(key: K, snapshotState: TData[K]) => void;
+  readonly getAllKeys: () => Iterable<TKey>;
   readonly applyMessage: (message: StoreMessage<TData, TKey>) => boolean;
   readonly channel?: StoreMessageChannel<TData, TKey>;
   readonly clock?: () => number;
@@ -555,10 +575,27 @@ export function createStoreHistory<
     }
   }
 
-  function travelTo(index: number): void {
+  function restoreStoreAt(index: number): void {
     ensureIndexInRange(index);
     config.applySnapshot(history[index]!.snapshot);
     currentIndex = index;
+    notifyVersion();
+  }
+
+  function restoreResource<K extends TKey>(key: K, index?: number): void {
+    const targetIndex = index !== undefined ? index : currentIndex;
+    ensureIndexInRange(targetIndex);
+
+    // Validate that the key is a valid store key
+    const allKeys = new Set(Array.from(config.getAllKeys()));
+    if (!allKeys.has(key)) {
+      throw new Error(INVALID_STORE_KEY_ERROR);
+    }
+
+    const snapshot = history[targetIndex]!.snapshot;
+    const snapshotState = snapshot[key] as TData[K] | undefined;
+
+    config.applyKeyUpdate(key, snapshotState ?? createDefaultState() as TData[K]);
     notifyVersion();
   }
 
@@ -567,7 +604,7 @@ export function createStoreHistory<
       return false;
     }
 
-    travelTo(currentIndex - 1);
+    restoreStoreAt(currentIndex - 1);
     return true;
   }
 
@@ -576,7 +613,7 @@ export function createStoreHistory<
       return false;
     }
 
-    travelTo(currentIndex + 1);
+    restoreStoreAt(currentIndex + 1);
     return true;
   }
 
@@ -753,7 +790,8 @@ export function createStoreHistory<
     replay(input: number | readonly number[]) {
       return replayByIds(input);
     },
-    travelTo,
+    restoreStoreAt,
+    restoreResource,
     undo,
     redo,
     getHistory<K extends TKey>(key?: K) {

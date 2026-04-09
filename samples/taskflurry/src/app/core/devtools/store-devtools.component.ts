@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 
-import { StoreHistoryVizComponent } from './store-history-viz.component';
+import { HistoryVizStore, StoreHistoryVizComponent } from './store-history-viz.component';
 import { PROJECTS_STORE } from '../../projects/application/store/projects.store';
 import { TasksStore } from '../../tasks/application/store/tasks.store';
 
@@ -47,6 +47,6 @@ import { TasksStore } from '../../tasks/application/store/tasks.store';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class StoreDevtoolsComponent {
-  protected readonly projectsStore = inject(PROJECTS_STORE);
-  protected readonly tasksStore = inject(TasksStore);
+  protected readonly projectsStore = inject(PROJECTS_STORE) as unknown as HistoryVizStore;
+  protected readonly tasksStore = inject(TasksStore) as unknown as HistoryVizStore;
 }

@@ -136,7 +136,7 @@ export interface IStore<TData extends StoreDataShape<TData>> {
   /**
    * Re-executes previously published channel message id(s).
    *
-   * Unlike `travelTo(...)`, replay goes back through the broker/consumer path,
+   * Unlike `restoreStoreAt(...)`, replay goes back through the broker/consumer path,
    * so it can mutate the store again, truncate future history after time
    * travel, and record new acknowledged history entries.
    */
@@ -146,7 +146,19 @@ export interface IStore<TData extends StoreDataShape<TData>> {
    *
    * This navigates snapshots only and does not re-run any message.
    */
-  travelTo: StoreHistory<TData>["travelTo"];
+  restoreStoreAt: StoreHistory<TData>["restoreStoreAt"];
+  /**
+   * Restores a single store key to its state at a specific history index.
+   *
+   * Unlike `restoreStoreAt(index)` which restores the full snapshot, this method
+   * only restores the specified key while leaving other keys unaffected.
+   * This is snapshot navigation only. It does not publish or acknowledge any
+   * message and does not create a new history entry.
+   *
+   * @param key - The store key to restore.
+   * @param index - Optional history index. Defaults to the current index.
+   */
+  restoreResource: StoreHistory<TData>["restoreResource"];
   /** Moves one step backward in the recorded snapshot history when possible. */
   undo: StoreHistory<TData>["undo"];
   /** Moves one step forward in the recorded snapshot history when possible. */
@@ -173,7 +185,7 @@ export interface IStore<TData extends StoreDataShape<TData>> {
   replayDeadLetter: StoreHistory<TData>["replayDeadLetter"];
   /** Attempts to replay all current dead-letter messages once. */
   replayDeadLetters: StoreHistory<TData>["replayDeadLetters"];
-  /** Returns the currently restored snapshot index used by `travelTo`, `undo`, and `redo`. */
+  /** Returns the currently restored snapshot index used by `restoreStoreAt`, `undo`, and `redo`. */
   getCurrentIndex: StoreHistory<TData>["getCurrentIndex"];
   /** Merges a single entity into a keyed slot and sets its status to `'Success'`. */
   updateKeyedOne<K extends StoreKey<TData>>(

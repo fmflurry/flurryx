@@ -27,7 +27,7 @@ First stable release. The public API is now considered stable and follows semver
 
 - **Message queueing and history** — every store mutation is now a typed, immutable message published to an internal broker channel. Messages are tracked
   with stable numeric ids, delivery status, and attempt counts.
-- **History and time travel** — full store snapshots are captured after each acknowledged message. Navigate with `travelTo(index)`, `undo()`, `redo()`, and
+- **History and time travel** — full store snapshots are captured after each acknowledged message. Navigate with `restoreStoreAt(index)`, `undo()`, `redo()`, and
   `getCurrentIndex()`.
 - **Message replay** — re-execute previously published messages by id with `replay(id)` or `replay(ids)`. Creates new acknowledged history entries.
 - **Dead-letter recovery** — failed messages are moved to a dead-letter queue instead of crashing the store. Inspect with `getDeadLetters()`, retry with

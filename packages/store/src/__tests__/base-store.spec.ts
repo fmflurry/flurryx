@@ -75,7 +75,7 @@ describe("BaseStore", () => {
       ]);
       expect(store.currentIndex()).toBe(2);
 
-      store.travelTo(1);
+      store.restoreStoreAt(1);
       expect(store.currentIndex()).toBe(1);
       expect(store.get(TestStoreEnum.ITEM_ONE)().data).toBe("one");
       expect(store.get(TestStoreEnum.ITEM_TWO)().data).toBeUndefined();
@@ -93,7 +93,7 @@ describe("BaseStore", () => {
       store.update(TestStoreEnum.ITEM_ONE, { data: "one", status: "Success" });
       const messageId = store.messages()[0]?.id;
 
-      store.travelTo(0);
+      store.restoreStoreAt(0);
 
       expect(store.replay(messageId!)).toBe(1);
       expect(store.history()).toHaveLength(2);

@@ -28,8 +28,8 @@ export class App {
   protected readonly menuOpen = signal(false);
 
   protected readonly storeSources: readonly StoreActivitySource[] = [
-    { name: 'Tasks', store: inject(TasksStore) },
-    { name: 'Projects', store: inject(PROJECTS_STORE) },
+    { name: 'Tasks', store: inject(TasksStore) as unknown as StoreActivitySource['store'] },
+    { name: 'Projects', store: inject(PROJECTS_STORE) as unknown as StoreActivitySource['store'] },
   ];
 
   constructor() {

@@ -42,3 +42,6 @@ export type {
   StoreHistory,
   StoreHistoryEntry,
 } from "./store-replay";
+export {
+  INVALID_STORE_KEY_ERROR,
+} from "./store-replay";

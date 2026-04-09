@@ -47,6 +47,10 @@ export interface StoreNotifier<TData extends StoreDataShape<TData>> {
 export interface StoreMessageConsumer<TData extends StoreDataShape<TData>> {
   applyMessage(message: StoreMessage<TData>): boolean;
   applySnapshot(snapshot: StoreSnapshot<TData>): void;
+  applyKeyUpdate<K extends StoreKey<TData>>(
+    key: K,
+    snapshotState: TData[K]
+  ): void;
   createSnapshot(): StoreSnapshot<TData>;
 }
 
@@ -302,9 +306,20 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
     return Object.fromEntries(entries) as StoreSnapshot<TData>;
   }
 
+  function applyKeyUpdate<K extends StoreKey<TData>>(
+    key: K,
+    snapshotState: TData[K]
+  ): void {
+    const sig = signals.getOrCreate(key);
+    const currentState = sig();
+    const patch = createSnapshotRestorePatch(currentState, snapshotState);
+    applyUpdate(key, patch, true);
+  }
+
   return {
     applyMessage,
     applySnapshot,
+    applyKeyUpdate,
     createSnapshot: captureSnapshot,
   };
 }

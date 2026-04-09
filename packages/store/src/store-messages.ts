@@ -118,10 +118,12 @@ export type StoreSnapshot<
 /** Delivery status of a broker message: `"pending"` → `"acknowledged"` or `"dead-letter"`. */
 export type StoreMessageStatus = "pending" | "acknowledged" | "dead-letter";
 
-/** Error message thrown when `travelTo()` receives an index outside the recorded history range. */
+/** Error message thrown when `restoreStoreAt()` receives an index outside the recorded history range. */
 export const INVALID_HISTORY_INDEX_ERROR = "History index is out of range";
 /** Error message thrown when `replay()` receives an id that does not match a persisted channel message. */
 export const INVALID_HISTORY_MESSAGE_ID_ERROR =
   "History message id is out of range";
 /** Error message recorded in dead-letter entries when the store consumer does not acknowledge a message. */
 export const MESSAGE_NOT_ACKNOWLEDGED_ERROR = "Message was not acknowledged";
+/** Error message thrown when `restoreResource()` receives a key that is not a valid store key. */
+export const INVALID_STORE_KEY_ERROR = "Invalid store key";

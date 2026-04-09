@@ -1,6 +1,6 @@
 {
   "name": "flurryx",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Signal-first reactive state management for Angular",
   "license": "MIT",
   "type": "module",

@@ -6,6 +6,7 @@
   ],
   "scripts": {
     "build": "npm run build -w packages/core && npm run build -w packages/store && npm run build -w packages/rx && npm run build -w packages/flurryx",
+    "marketing:capture": "node tools/marketing-gifs/run.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --config packages/core/vitest.config.ts --coverage && vitest run --config packages/store/vitest.config.ts --coverage && vitest run --config packages/rx/vitest.config.ts --coverage && vitest run --config packages/flurryx/vitest.config.ts --coverage",
@@ -20,6 +21,7 @@
     "@changesets/cli": "^2.27.0",
     "@types/node": "^25.5.2",
     "@vitest/coverage-v8": "^2.1.9",
+    "playwright": "^1.55.0",
     "rxjs": "^7.8.2",
     "tsup": "^8.0.0",
     "typescript": "~5.5.0",

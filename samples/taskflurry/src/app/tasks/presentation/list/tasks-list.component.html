@@ -1,7 +1,7 @@
-<div class="tasks-list">
-  <div class="tasks-list__header">
+<div class="tasks-list" data-testid="tasks-list">
+  <div class="tasks-list__header" data-testid="tasks-list-header">
     <h1>Tasks</h1>
-    <a routerLink="../create" class="tasks-list__create-btn">Create Task</a>
+    <a routerLink="../create" class="tasks-list__create-btn" data-testid="tasks-create-link">Create Task</a>
   </div>
 
   @if (isLoading()) {
@@ -21,23 +21,24 @@
     @if (tasks().length === 0) {
       <div class="tasks-list__empty">No tasks found. Create one to get started.</div>
     } @else {
-      <ul class="tasks-list__items">
-        @for (task of tasks(); track task.id) {
-          <li class="tasks-list__item">
-            <a [routerLink]="['../', task.id]" class="tasks-list__item-link">
-              <span class="tasks-list__item-title">{{ task.title }}</span>
-              <span class="tasks-list__item-priority" [attr.data-priority]="task.priority">
+        <ul class="tasks-list__items">
+          @for (task of tasks(); track task.id) {
+            <li class="tasks-list__item" [attr.data-testid]="'tasks-list-item-' + task.id">
+              <a [routerLink]="['../', task.id]" class="tasks-list__item-link">
+                <span class="tasks-list__item-title">{{ task.title }}</span>
+                <span class="tasks-list__item-priority" [attr.data-priority]="task.priority">
                 {{ task.priority }}
               </span>
               <span class="tasks-list__item-status" [attr.data-status]="task.status">
                 {{ task.status }}
               </span>
-              <button
-                class="tasks-list__item-delete"
-                title="Delete"
-                (click)="deleteTask($event, task.id)"
-              >
-                &#x2715;
+                <button
+                  class="tasks-list__item-delete"
+                  title="Delete"
+                  [attr.data-testid]="'tasks-delete-' + task.id"
+                  (click)="deleteTask($event, task.id)"
+                >
+                  &#x2715;
               </button>
             </a>
           </li>

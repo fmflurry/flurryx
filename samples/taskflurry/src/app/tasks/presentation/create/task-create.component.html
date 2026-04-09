@@ -4,17 +4,17 @@
   <h1 class="task-create__title">Create Task</h1>
 
   @if (isCreated()) {
-    <div class="task-create__success">
+    <div class="task-create__success" data-testid="task-create-success">
       <p class="task-create__success-title">Task created successfully!</p>
       <div class="task-create__success-links">
-        <a [routerLink]="['/tasks', createdTaskId()]" class="task-create__link">
+        <a [routerLink]="['/tasks', createdTaskId()]" class="task-create__link" data-testid="task-create-view-task">
           View task
         </a>
-        <a routerLink="/tasks/list" class="task-create__link">
+        <a routerLink="/tasks/list" class="task-create__link" data-testid="task-create-back-to-list">
           Back to task list
         </a>
         @if (cameFromProject()) {
-          <a routerLink="/projects/list" class="task-create__link task-create__link--primary">
+          <a routerLink="/projects/list" class="task-create__link task-create__link--primary" data-testid="task-create-back-to-project">
             Back to project
           </a>
         }
@@ -30,10 +30,10 @@
       </div>
     }
 
-    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="task-create__form">
+    <form [formGroup]="form" (ngSubmit)="onSubmit()" class="task-create__form" data-testid="task-create-form">
       <div class="task-create__field">
         <label for="title" class="task-create__label">Title</label>
-        <input id="title" formControlName="title" type="text" class="task-create__input" />
+        <input id="title" formControlName="title" type="text" class="task-create__input" data-testid="task-create-title" />
         @if (form.controls.title.touched && form.controls.title.errors) {
           <span class="task-create__field-error">Title is required (min 3 characters).</span>
         }
@@ -46,12 +46,13 @@
           formControlName="description"
           rows="4"
           class="task-create__textarea"
+          data-testid="task-create-description"
         ></textarea>
       </div>
 
       <div class="task-create__field">
         <label for="priority" class="task-create__label">Priority</label>
-        <select id="priority" formControlName="priority" class="task-create__select">
+        <select id="priority" formControlName="priority" class="task-create__select" data-testid="task-create-priority">
           @for (priority of priorities; track priority) {
             <option [value]="priority">{{ priority }}</option>
           }
@@ -60,7 +61,7 @@
 
       <div class="task-create__field">
         <label for="projectId" class="task-create__label">Project</label>
-        <select id="projectId" formControlName="projectId" class="task-create__select">
+        <select id="projectId" formControlName="projectId" class="task-create__select" data-testid="task-create-project">
           <option value="" disabled>
             @if (isLoadingProjects()) {
               Loading projects...
@@ -82,6 +83,7 @@
         <button
           type="submit"
           class="task-create__submit-btn"
+          data-testid="task-create-submit"
           [disabled]="form.invalid || isSubmitting()"
         >
           @if (isSubmitting()) {

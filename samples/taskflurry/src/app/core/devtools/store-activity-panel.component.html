@@ -1,5 +1,5 @@
 <!-- FAB -->
-<button class="sap-fab" [class.sap-fab--open]="open()" (click)="toggle()">
+<button class="sap-fab" [class.sap-fab--open]="open()" (click)="toggle()" data-testid="activity-panel-toggle">
   <span class="sap-fab__icon">&#x26A1;</span>
   @if (!open() && opCount() > 0) {
     <span class="sap-fab__badge">{{ opCount() }}</span>
@@ -7,7 +7,7 @@
 </button>
 
 @if (open()) {
-  <div class="sap" (click)="$event.stopPropagation()">
+  <div class="sap" (click)="$event.stopPropagation()" data-testid="activity-panel">
 
     <!-- Header: store tabs + undo/redo -->
     <header class="sap__head">
@@ -16,16 +16,17 @@
           <button
             class="sap__store"
             [class.sap__store--on]="i === selectedStoreIndex()"
+            [attr.data-testid]="'activity-store-' + i"
             (click)="selectStore(i)"
           >{{ s.name }}</button>
         }
       </div>
       <div class="sap__controls">
-        <button class="sap__ctrl" [disabled]="!canUndo()" (click)="undo()" title="Undo">
+        <button class="sap__ctrl" [disabled]="!canUndo()" (click)="undo()" title="Undo" data-testid="activity-undo">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h13a4 4 0 0 1 0 8H7"/><path d="m3 10 4-4"/><path d="m3 10 4 4"/></svg>
         </button>
         <span class="sap__pos">{{ currentIndex() }} <span class="sap__pos-sep">/</span> {{ opCount() }}</span>
-        <button class="sap__ctrl" [disabled]="!canRedo()" (click)="redo()" title="Redo">
+        <button class="sap__ctrl" [disabled]="!canRedo()" (click)="redo()" title="Redo" data-testid="activity-redo">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10H8a4 4 0 0 0 0 8h10"/><path d="m21 10-4-4"/><path d="m21 10-4 4"/></svg>
         </button>
       </div>
@@ -33,10 +34,10 @@
 
     <!-- Tab bar -->
     <nav class="sap__tabs">
-      <button class="sap__tab" [class.sap__tab--on]="activeTab() === 'history'" (click)="setTab('history')">
+      <button class="sap__tab" [class.sap__tab--on]="activeTab() === 'history'" (click)="setTab('history')" data-testid="activity-tab-history">
         Timeline
       </button>
-      <button class="sap__tab" [class.sap__tab--on]="activeTab() === 'messages'" (click)="setTab('messages')">
+      <button class="sap__tab" [class.sap__tab--on]="activeTab() === 'messages'" (click)="setTab('messages')" data-testid="activity-tab-messages">
         Messages
       </button>
     </nav>
@@ -52,6 +53,7 @@
             [class.sap__item--active]="entry.index === currentIndex()"
             [class.sap__item--past]="entry.index < currentIndex()"
             [class.sap__item--future]="entry.index > currentIndex()"
+            [attr.data-testid]="'activity-history-entry-' + entry.index"
             [disabled]="entry.index === currentIndex()"
             (click)="restoreAt(entry.index)"
           >
@@ -89,7 +91,7 @@
               <div class="sap__msg-bottom">
                 <span class="sap__msg-meta">#{{ msg.id }} &middot; {{ formatTime(msg.createdAt) }}</span>
                 @if (msg.status === 'acknowledged') {
-                  <button class="sap__msg-action" (click)="replay(msg.id)">Replay</button>
+                  <button class="sap__msg-action" [attr.data-testid]="'activity-replay-' + msg.id" (click)="replay(msg.id)">Replay</button>
                 }
               </div>
             </div>

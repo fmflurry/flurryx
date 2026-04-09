@@ -21,11 +21,11 @@
 
   @if (task(); as task) {
     @if (editing()) {
-      <div class="task-detail__card">
-        <form [formGroup]="form" (ngSubmit)="saveChanges()" class="task-detail__form">
+      <div class="task-detail__card" data-testid="task-detail-edit-card">
+        <form [formGroup]="form" (ngSubmit)="saveChanges()" class="task-detail__form" data-testid="task-detail-form">
           <div class="task-detail__field">
             <label for="title" class="task-detail__label">Title</label>
-            <input id="title" formControlName="title" type="text" class="task-detail__input" />
+            <input id="title" formControlName="title" type="text" class="task-detail__input" data-testid="task-detail-title-input" />
             @if (form.controls.title.touched && form.controls.title.errors) {
               <span class="task-detail__field-error">Title is required (min 3 characters).</span>
             }
@@ -38,13 +38,14 @@
               formControlName="description"
               rows="4"
               class="task-detail__textarea"
+              data-testid="task-detail-description-input"
             ></textarea>
           </div>
 
           <div class="task-detail__field-row">
             <div class="task-detail__field">
               <label for="priority" class="task-detail__label">Priority</label>
-              <select id="priority" formControlName="priority" class="task-detail__select">
+              <select id="priority" formControlName="priority" class="task-detail__select" data-testid="task-detail-priority-input">
                 @for (p of priorities; track p) {
                   <option [value]="p">{{ p }}</option>
                 }
@@ -53,7 +54,7 @@
 
             <div class="task-detail__field">
               <label for="status" class="task-detail__label">Status</label>
-              <select id="status" formControlName="status" class="task-detail__select">
+              <select id="status" formControlName="status" class="task-detail__select" data-testid="task-detail-status-input">
                 @for (s of statuses; track s) {
                   <option [value]="s">{{ s }}</option>
                 }
@@ -62,12 +63,13 @@
           </div>
 
           <div class="task-detail__actions">
-            <button type="button" class="task-detail__cancel-btn" (click)="cancelEditing()">
+            <button type="button" class="task-detail__cancel-btn" (click)="cancelEditing()" data-testid="task-detail-cancel-edit">
               Cancel
             </button>
             <button
               type="submit"
               class="task-detail__save-btn"
+              data-testid="task-detail-save"
               [disabled]="form.invalid"
             >
               Save changes
@@ -76,20 +78,20 @@
         </form>
       </div>
     } @else {
-      <div class="task-detail__card">
+      <div class="task-detail__card" data-testid="task-detail-card">
         <div class="task-detail__card-header">
-          <h1 class="task-detail__title">{{ task.title }}</h1>
+          <h1 class="task-detail__title" data-testid="task-detail-title">{{ task.title }}</h1>
           <div class="task-detail__header-actions">
-            <button class="task-detail__edit-btn" (click)="startEditing(task)">Edit</button>
-            <button class="task-detail__delete-btn" (click)="deleteTask()">Delete</button>
+            <button class="task-detail__edit-btn" (click)="startEditing(task)" data-testid="task-detail-edit">Edit</button>
+            <button class="task-detail__delete-btn" (click)="deleteTask()" data-testid="task-detail-delete">Delete</button>
           </div>
         </div>
 
         <div class="task-detail__meta">
-          <span class="task-detail__priority" [attr.data-priority]="task.priority">
+          <span class="task-detail__priority" [attr.data-priority]="task.priority" data-testid="task-detail-priority">
             {{ task.priority }}
           </span>
-          <span class="task-detail__status" [attr.data-status]="task.status">
+          <span class="task-detail__status" [attr.data-status]="task.status" data-testid="task-detail-status">
             {{ task.status }}
           </span>
         </div>

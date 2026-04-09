@@ -14,20 +14,21 @@
 }
 
 @if (!isLoading() && !hasError()) {
-  <div class="projects-header">
+  <div class="projects-header" data-testid="projects-header">
     <h2>Projects</h2>
     @if (selectedProjectId()) {
-      <button class="clear-selection-btn" (click)="clearSelection()">
+      <button class="clear-selection-btn" (click)="clearSelection()" data-testid="projects-clear-selection">
         Clear Selection
       </button>
     }
   </div>
 
-  <div class="projects-grid">
+  <div class="projects-grid" data-testid="projects-grid">
     @for (project of projects(); track project.id) {
       <div
         class="project-card"
         [class.selected]="isSelected(project)"
+        [attr.data-testid]="'project-card-' + project.id"
         (click)="selectProject(project)"
       >
         <div class="color-indicator" [style.background-color]="project.color"></div>
@@ -49,11 +50,12 @@
   </div>
 
   @if (selectedProject(); as project) {
-    <section class="tasks-section">
+    <section class="tasks-section" data-testid="project-tasks-section">
       <div class="tasks-header">
         <h3>Tasks for {{ project.name }}</h3>
         <a
           class="create-task-btn"
+          data-testid="project-create-task"
           [routerLink]="['/tasks/create']"
           [queryParams]="{ projectId: project.id }"
         >
@@ -66,7 +68,7 @@
       } @else {
         <div class="tasks-list">
           @for (task of projectTasks(); track task.id) {
-            <a class="task-row" [routerLink]="['/tasks', task.id]">
+            <a class="task-row" [routerLink]="['/tasks', task.id]" [attr.data-testid]="'project-task-row-' + task.id">
               <span class="task-status" [attr.data-status]="task.status">
                 {{ task.status }}
               </span>
@@ -77,6 +79,7 @@
               <button
                 class="task-delete"
                 title="Delete"
+                [attr.data-testid]="'project-task-delete-' + task.id"
                 (click)="deleteTask($event, task.id)"
               >
                 &#x2715;

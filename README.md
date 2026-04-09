@@ -36,6 +36,8 @@
 <p align="center">
   <a href="https://fmflurry.github.io/flurryx/">Live demo</a>
   ·
+  <a href="#in-action">In action</a>
+  ·
   <a href="#feature-summary">Feature summary</a>
   ·
   <a href="#getting-started">Getting started</a>
@@ -46,6 +48,42 @@
 > **See it in action** — [**Taskflurry**](https://fmflurry.github.io/flurryx/) is a live demo app built with Angular 21 (zoneless, no zone.js dependency) and flurryx. It showcases store definitions, the facade pattern with `@SkipIfCached` and `@Loading`, keyed resources with per-entity loading and errors, and Clean Architecture layering. Try the [live demo](https://fmflurry.github.io/flurryx/) or browse the [source code](samples/taskflurry).
 
 flurryx bridges the gap between RxJS async operations and Angular signals. Define a store, pipe your HTTP calls through an operator, read signals in your templates, queue store messages when you need to batch updates, and replay history when you need deterministic state transitions. No actions, no reducers, no effects boilerplate.
+
+## In Action
+
+TaskFlurry is a demo Angular application built with Flurryx to showcase the library’s capabilities.
+
+It demonstrates how to manage shared state, structure facade-driven workflows, and leverage built-in history to make state transitions explicit and easy to inspect.
+
+### Store History Time Travel
+
+> **Replayable state out of the box. Jump back, restore, move on.** A deleted task is restored by jumping directly to the exact store history entry that brought it out of the list. This is the kind of inspectable, replayable state flow flurryx gives you without building custom devtools first.
+
+<img src="assets/readme/history-time-travel.gif" alt="Store history time travel in Taskflurry" />
+
+### Projects to Tasks Drill-down
+
+> **Derived state without UI drift.** Selecting a project immediately reshapes the task view from shared store state. The UI stays coherent because the project context and the derived task list are driven from the same reactive foundation.
+
+<img src="assets/readme/projects-to-tasks.gif" alt="Projects to tasks drill-down in Taskflurry" />
+
+### Task Creation Flow
+
+> **Fast workflows, no ceremony.** From context to success state, no reducer overhead. It shows how flurryx keeps normal app workflows simple without pushing everything through reducer-heavy ceremony.
+
+<img src="assets/readme/create-task.gif" alt="Task creation flow in Taskflurry" />
+
+### Task Update Flow
+
+> **Edit in place. Stay in sync.** Editing a task updates the detail view in place with the new status and content. Update once, UI follows, history included.
+
+<img src="assets/readme/update-task.gif" alt="Task update flow in Taskflurry" />
+
+### Delete Task Flow
+
+> **Simple changes, fully traceable.** Deleting from the list immediately updates the visible state with no extra reducer wiring or action choreography. Minimal logic, full visibility.
+
+<img src="assets/readme/delete-task.gif" alt="Delete task flow in Taskflurry" />
 
 ## What It Looks Like
 
@@ -198,6 +236,7 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 
 - [What It Looks Like](#what-it-looks-like)
 - [Why flurryx?](#why-flurryx)
+- [In Action](#in-action)
 - [Feature Summary](#feature-summary)
 - [Packages](#packages)
 - [How to Install](#how-to-install)
@@ -1541,7 +1580,6 @@ If your tool is not skill-aware, you can still point it at `skills/flurryx/SKILL
 - Time travel, replay, and dead-letter recovery
 - Error normalization (default, HTTP, custom)
 - Anti-patterns to avoid (no `any`, avoid accidental caching, decorator ordering)
-
 
 ---
 

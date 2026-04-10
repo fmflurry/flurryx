@@ -21,13 +21,12 @@ Signal-first reactive state management for Angular.
 
 Before writing code, verify these anchors exist in the active branch:
 
-| Anchor                | What to look for                                                                   |
-| --------------------- | ---------------------------------------------------------------------------------- |
-| Store builder         | `Store.for<Config>().build()` or fluent `Store.resource(...).as<>()`               |
-| Resource wrappers     | `ResourceState<T>` and `KeyedResourceData<TKey, TValue>`                           |
-| Rx bridge             | `syncToStore` and `syncToKeyedStore`                                               |
-| Decorators            | `@SkipIfCached` and `@Loading`                                                     |
-| Reference application | `samples/taskflurry/` as an example of one way to organize flurryx in a larger app |
+| Anchor            | What to look for                                                     |
+| ----------------- | -------------------------------------------------------------------- |
+| Store builder     | `Store.for<Config>().build()` or fluent `Store.resource(...).as<>()` |
+| Resource wrappers | `ResourceState<T>` and `KeyedResourceData<TKey, TValue>`             |
+| Rx bridge         | `syncToStore` and `syncToKeyedStore`                                 |
+| Decorators        | `@SkipIfCached` and `@Loading`                                       |
 
 If one or more anchors are missing:
 
@@ -58,8 +57,6 @@ UI layer --> flurryx orchestration layer --> async/data layer
 - In many apps that boundary is a facade; in others it may be a service, feature store wrapper, or controller-like class
 
 ## Recommended Architecture
-
-The `samples/taskflurry/` app demonstrates a facade -> use-case -> port -> adapter approach. That is a recommended pattern, not a requirement.
 
 - If the codebase already uses facades, keep flurryx orchestration in facades
 - If the codebase uses plain Angular services, keep flurryx orchestration in services

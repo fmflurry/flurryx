@@ -16,6 +16,7 @@ import { UpdateTaskUseCase } from '../use-cases/update-task.use-case';
 import { DeleteTaskUseCase } from '../use-cases/delete-task.use-case';
 import { GetTaskProjectsUseCase } from '../use-cases/get-task-projects.use-case';
 import { SnackbarService } from '../../../core/snackbar/snackbar.service';
+import { asDeadLetterCommand } from '../../../core/devtools/store-activity-command';
 
 @Injectable()
 export class TasksFacade {
@@ -43,7 +44,14 @@ export class TasksFacade {
   @SkipIfCached(TasksStoreEnum.TASKS, (instance: TasksFacade) => instance.store)
   @Loading(TasksStoreEnum.TASKS, (instance: TasksFacade) => instance.store)
   loadTasks(): void {
-    this.getTasksUseCase.execute().pipe(syncToStore(this.store, TasksStoreEnum.TASKS)).subscribe();
+    this.getTasksUseCase
+      .execute()
+      .pipe(
+        syncToStore(this.store, TasksStoreEnum.TASKS, {
+          deadLetterCommand: asDeadLetterCommand({ type: 'tasks.load' }),
+        })
+      )
+      .subscribe();
   }
 
   @SkipIfCached(TasksStoreEnum.TASK_DETAIL, (instance: TasksFacade) => instance.store)
@@ -51,7 +59,14 @@ export class TasksFacade {
   loadTaskDetail(taskId: string): void {
     this.getTaskDetailUseCase
       .execute(taskId)
-      .pipe(syncToKeyedStore(this.store, TasksStoreEnum.TASK_DETAIL, taskId))
+      .pipe(
+        syncToKeyedStore(this.store, TasksStoreEnum.TASK_DETAIL, taskId, {
+          deadLetterCommand: asDeadLetterCommand({
+            type: 'tasks.detail.load',
+            payload: { taskId },
+          }),
+        })
+      )
       .subscribe();
   }
 
@@ -62,6 +77,10 @@ export class TasksFacade {
       .pipe(
         syncToStore(this.store, TasksStoreEnum.TASK_CREATION, {
           callbackAfterComplete: () => this.clearTasks(),
+          deadLetterCommand: asDeadLetterCommand({
+            type: 'tasks.create',
+            payload: { value: payload },
+          }),
         })
       )
       .subscribe();
@@ -76,7 +95,11 @@ export class TasksFacade {
   loadProjects(): void {
     this.getTaskProjectsUseCase
       .execute()
-      .pipe(syncToStore(this.store, TasksStoreEnum.PROJECTS))
+      .pipe(
+        syncToStore(this.store, TasksStoreEnum.PROJECTS, {
+          deadLetterCommand: asDeadLetterCommand({ type: 'tasks.projects.load' }),
+        })
+      )
       .subscribe();
   }
 
@@ -87,6 +110,10 @@ export class TasksFacade {
       .pipe(
         syncToKeyedStore(this.store, TasksStoreEnum.TASK_DETAIL, taskId, {
           callbackAfterComplete: () => this.clearTasks(),
+          deadLetterCommand: asDeadLetterCommand({
+            type: 'tasks.update',
+            payload: { taskId, value: payload },
+          }),
         })
       )
       .subscribe();

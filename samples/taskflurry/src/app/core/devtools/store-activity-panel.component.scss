@@ -338,15 +338,38 @@ $red-soft: #fef2f2;
 
 .sap__msg-bottom {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   margin-top: 4px;
+  gap: 8px;
 }
 
 .sap__msg-meta {
   font-size: 10px;
   color: $faint;
   font-variant-numeric: tabular-nums;
+}
+
+.sap__msg-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  max-width: 180px;
+  font-size: 10px;
+  color: $red;
+  text-align: right;
+}
+
+.sap__msg-error-summary {
+  font-weight: 600;
+}
+
+.sap__msg-error-detail {
+  color: rgba($red, 0.78);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sap__msg-action {

@@ -5,6 +5,7 @@ import type {
   StoreDataShape,
   StoreKey,
 } from "./types";
+import type { StoreDeadLetterMeta } from "./store-dead-letter";
 
 /** Message produced by `store.update(key, partial)` — merges partial state into a slot. */
 export type UpdateStoreMessage<
@@ -15,6 +16,7 @@ export type UpdateStoreMessage<
     readonly type: "update";
     readonly key: K;
     readonly state: Partial<TData[K]>;
+    readonly deadLetter?: StoreDeadLetterMeta;
   };
 }[TKey];
 

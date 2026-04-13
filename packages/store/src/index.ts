@@ -8,8 +8,9 @@ export { collectKeyed } from "./collect-keyed";
 export type { MirrorOptions } from "./mirror-key";
 export type { DeriveOptions } from "./derive-key";
 export type { CollectKeyedOptions } from "./collect-keyed";
-export type { IStore, ConfigToData, StoreOptions } from "./types";
+export type { IStore, ConfigToData, StoreOptions, StoreUpdateOptions } from "./types";
 export { cloneValue, createSnapshotRestorePatch } from "./store-clone";
+export type { StoreDeadLetterCommand, StoreDeadLetterMeta } from "./store-dead-letter";
 export {
   createInMemoryStoreMessageChannel,
   createStorageStoreMessageChannel,
@@ -40,6 +41,7 @@ export type {
   StartKeyedLoadingStoreMessage,
 } from "./store-messages";
 export type {
+  DeadLetterCommandResolverResult,
   StoreDeadLetterEntry,
   StoreHistory,
   StoreHistoryEntry,

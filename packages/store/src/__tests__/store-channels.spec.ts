@@ -355,6 +355,7 @@ describe("in-memory channel", () => {
       lastAttemptedAt: null,
       acknowledgedAt: null,
       error: null,
+      deadLetter: null,
     };
 
     channel.saveMessage(newRecord);

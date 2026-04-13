@@ -23,11 +23,11 @@ export function defaultErrorNormalizer(error: unknown): ResourceErrors {
     typeof error === "object" &&
     error !== null &&
     "error" in error &&
-    typeof (error as Record<string, unknown>).error === "object"
+    typeof (error as Record<string, unknown>)["error"] === "object"
   ) {
     const inner = (error as { error: Record<string, unknown> }).error;
-    if (inner && Array.isArray(inner.errors)) {
-      return inner.errors as ResourceErrors;
+    if (inner && Array.isArray(inner["errors"])) {
+      return inner["errors"] as ResourceErrors;
     }
   }
 

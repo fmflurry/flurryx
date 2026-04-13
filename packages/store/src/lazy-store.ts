@@ -1,6 +1,12 @@
 import { signal, type Signal, WritableSignal } from "@angular/core";
 import { type ResourceState, type KeyedResourceKey } from "@flurryx/core";
-import type { IStore, StoreDataShape, StoreKey, StoreOptions } from "./types";
+import type {
+  IStore,
+  StoreDataShape,
+  StoreKey,
+  StoreOptions,
+  StoreUpdateOptions,
+} from "./types";
 import { cloneValue } from "./store-clone";
 import {
   createStoreHistory,
@@ -81,6 +87,12 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   /** @inheritDoc */
   readonly replayDeadLetters = (): number =>
     this.historyDriver.replayDeadLetters();
+
+  /** @inheritDoc */
+  readonly replayDeadLetterCommand = (
+    id: number,
+    resolver: Parameters<StoreHistoryDriver<TData>["replayDeadLetterCommand"]>[1]
+  ): Promise<boolean> => this.historyDriver.replayDeadLetterCommand(id, resolver);
 
   /** @inheritDoc */
   readonly getCurrentIndex = () => this.historyDriver.getCurrentIndex();
@@ -180,9 +192,13 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   }
 
   /** @inheritDoc */
-  update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void {
+  update<K extends StoreKey<TData>>(
+    key: K,
+    newState: Partial<TData[K]>,
+    options?: StoreUpdateOptions
+  ): void {
     this.historyDriver.publish(
-      createUpdateMessage<TData, K>(key, cloneValue(newState))
+      createUpdateMessage<TData, K>(key, cloneValue(newState), options)
     );
   }
 

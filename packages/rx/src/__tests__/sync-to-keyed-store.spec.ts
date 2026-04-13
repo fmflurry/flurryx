@@ -69,6 +69,13 @@ describe("syncToKeyedStore", () => {
     expect(data.errors["missing"]).toEqual([
       { code: "404", message: "Not found" },
     ]);
+    expect(store.getDeadLetters()).toMatchObject([
+      {
+        error: "Not found",
+        httpStatus: 404,
+        httpMessage: "Not found",
+      },
+    ]);
   });
 
   it("should use mapResponse to transform data", () => {

@@ -13,11 +13,12 @@ import {
   defaultErrorNormalizer,
   type ErrorNormalizer,
 } from "../error/error-normalizer";
+import { createDeadLetterMeta } from "../error/dead-letter-meta";
 import type { SyncToStoreOptions } from "./sync-to-store";
 
 interface SyncToKeyedStoreRuntimeStore {
   get(key: PropertyKey): () => ResourceState<unknown>;
-  update(key: PropertyKey, newState: unknown): void;
+  update(key: PropertyKey, newState: unknown, options?: unknown): void;
 }
 
 /**
@@ -236,6 +237,8 @@ export function syncToKeyedStore(
             isLoading: isAnyKeyLoading(nextIsLoading),
             status: undefined,
             errors: undefined,
+          }, {
+            deadLetter: createDeadLetterMeta(error, options.deadLetterCommand),
           });
         },
       })

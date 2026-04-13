@@ -1,6 +1,7 @@
 import type { Signal } from "@angular/core";
 import type { StoreHistoryEntry } from "./store-replay";
 import type { StoreMessageRecord } from "./store-channels";
+import type { StoreDeadLetterMeta } from "./store-dead-letter";
 import type {
   ResourceState,
   KeyedResourceData,
@@ -114,6 +115,10 @@ export interface StoreOptions<
   TKey extends StoreKey<TData> = StoreKey<TData>
 > extends StoreMessageChannelOptions<TData, TKey> {}
 
+export interface StoreUpdateOptions {
+  readonly deadLetter?: StoreDeadLetterMeta;
+}
+
 /**
  * Shared store interface implemented by both BaseStore and LazyStore.
  *
@@ -124,14 +129,18 @@ export interface IStore<TData extends StoreDataShape<TData>> {
   /** Returns a read-only `Signal` for the given slot. */
   get<K extends StoreKey<TData>>(key: K): Signal<TData[K]>;
   /** Merges a partial state into the given slot (immutable spread). */
-  update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void;
+  update<K extends StoreKey<TData>>(
+    key: K,
+    newState: Partial<TData[K]>,
+    options?: StoreUpdateOptions
+  ): void;
   /** Resets a slot to its initial idle state (`{ data: undefined, isLoading: false, … }`). */
   clear<K extends StoreKey<TData>>(key: K): void;
   /** Resets every slot in this store. */
   clearAll(): void;
-  /** Marks a slot as loading: sets `isLoading: true` and clears `status`/`errors`. */
+  /** Marks a slot as loading: sets `isLoading: true` and clears `status`/`errors`. Triggers `onUpdate`. */
   startLoading<K extends StoreKey<TData>>(key: K): void;
-  /** Marks a slot as no longer loading: sets `isLoading: false`. */
+  /** Marks a slot as no longer loading: sets `isLoading: false`. Triggers `onUpdate`. */
   stopLoading<K extends StoreKey<TData>>(key: K): void;
   /**
    * Re-executes previously published channel message id(s).
@@ -185,6 +194,8 @@ export interface IStore<TData extends StoreDataShape<TData>> {
   replayDeadLetter: StoreHistory<TData>["replayDeadLetter"];
   /** Attempts to replay all current dead-letter messages once. */
   replayDeadLetters: StoreHistory<TData>["replayDeadLetters"];
+  /** Resolves one dead-letter entry by rerunning its originating command. */
+  replayDeadLetterCommand: StoreHistory<TData>["replayDeadLetterCommand"];
   /** Returns the currently restored snapshot index used by `restoreStoreAt`, `undo`, and `redo`. */
   getCurrentIndex: StoreHistory<TData>["getCurrentIndex"];
   /** Merges a single entity into a keyed slot and sets its status to `'Success'`. */
@@ -204,7 +215,7 @@ export interface IStore<TData extends StoreDataShape<TData>> {
     resourceKey: KeyedResourceKey
   ): void;
   /**
-   * Registers a callback invoked whenever the given slot is updated.
+   * Registers a callback invoked whenever the given slot changes.
    * @returns A cleanup function that removes the listener.
    */
   onUpdate<K extends StoreKey<TData>>(

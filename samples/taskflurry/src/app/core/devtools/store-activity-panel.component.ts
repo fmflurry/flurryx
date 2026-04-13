@@ -1,11 +1,14 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  inject,
   signal,
   computed,
   ViewEncapsulation,
   input,
 } from '@angular/core';
+import { createDeadLetterMessageDisplay } from './store-activity-panel.dead-letter';
+import { StoreActivityReplayService } from './store-activity-replay.service';
 
 interface StoreMsg {
   readonly type: string;
@@ -27,6 +30,16 @@ interface MessageRecord {
   readonly attempts: number;
   readonly createdAt: number;
   readonly acknowledgedAt: number | null;
+  readonly error?: string | null;
+  readonly deadLetter?: {
+    readonly error: string;
+    readonly httpStatus?: number | null;
+    readonly httpMessage?: string | null;
+    readonly command?: {
+      readonly type: string;
+      readonly payload?: unknown;
+    } | null;
+  } | null;
 }
 
 interface StoreSignals {
@@ -37,6 +50,16 @@ interface StoreSignals {
   redo(): boolean;
   restoreStoreAt(index: number): void;
   replay(id: number): number;
+  replayDeadLetterCommand(
+    id: number,
+    resolver: (entry: {
+      readonly id: number;
+      readonly error: string;
+      readonly httpStatus: number | null;
+      readonly httpMessage: string | null;
+      readonly command: { readonly type: string; readonly payload?: unknown } | null;
+    }) => Promise<{ readonly resolved: boolean; readonly clear: boolean }>
+  ): Promise<boolean>;
 }
 
 export interface StoreActivitySource {
@@ -65,6 +88,7 @@ const TYPE_LABELS: Record<string, string> = {
 })
 export class StoreActivityPanelComponent {
   readonly stores = input.required<readonly StoreActivitySource[]>();
+  private readonly replayService = inject(StoreActivityReplayService);
 
   protected readonly open = signal(false);
   protected readonly activeTab = signal<'history' | 'messages'>('history');
@@ -108,8 +132,13 @@ export class StoreActivityPanelComponent {
     this.activeStore().restoreStoreAt(index);
   }
 
-  protected replay(messageId: number): void {
-    this.activeStore().replay(messageId);
+  protected replay(message: MessageRecord): void {
+    if (message.deadLetter) {
+      void this.activeStore().replayDeadLetterCommand(message.id, (entry) => this.replayService.replay(entry));
+      return;
+    }
+
+    this.activeStore().replay(message.id);
   }
 
   protected typeLabel(type: string): string {
@@ -135,6 +164,15 @@ export class StoreActivityPanelComponent {
       return 'Store created';
     }
     return this.formatKey(entry.message);
+  }
+
+  protected deadLetterMessage(msg: MessageRecord) {
+    return createDeadLetterMessageDisplay({
+      status: msg.status,
+      error: msg.deadLetter?.error ?? msg.error ?? null,
+      httpStatus: msg.deadLetter?.httpStatus ?? null,
+      httpMessage: msg.deadLetter?.httpMessage ?? null,
+    });
   }
 
   protected formatTime(timestamp: number | null): string {

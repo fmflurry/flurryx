@@ -1039,6 +1039,66 @@ describe("built-in store broker history", () => {
     );
   });
 
+  it("includes structured dead-letter metadata on failed update messages", () => {
+    store.update(ReplayStoreEnum.COUNTER, {
+      status: "Error",
+      errors: [{ code: "404", message: "Not Found" }],
+    }, {
+      deadLetter: {
+        error: "Http failure response for /api/tasks/123: 404 Not Found",
+        httpStatus: 404,
+        httpMessage: "Not Found",
+      },
+    });
+
+    const deadLetters = store.getDeadLetters();
+
+    expect(deadLetters).toHaveLength(1);
+    expect(deadLetters[0]).toMatchObject({
+      error: "Http failure response for /api/tasks/123: 404 Not Found",
+      httpStatus: 404,
+      httpMessage: "Not Found",
+      message: {
+        type: "update",
+        key: ReplayStoreEnum.COUNTER,
+      },
+    });
+    expect(store.get(ReplayStoreEnum.COUNTER)().status).toBe("Error");
+  });
+
+  it("replays a dead-letter command through async resolver and clears the entry", async () => {
+    store.update(ReplayStoreEnum.COUNTER, {
+      status: "Error",
+      errors: [{ code: "503", message: "Service Unavailable" }],
+    }, {
+      deadLetter: {
+        error: "Service Unavailable",
+        httpStatus: 503,
+        httpMessage: "Service Unavailable",
+        command: {
+          type: "tasks.load",
+          payload: { scope: "all" },
+        },
+      },
+    });
+
+    const deadLetterId = store.getDeadLetters()[0]!.id;
+    const resolved = await store.replayDeadLetterCommand(deadLetterId, async (entry) => {
+      expect(entry.command).toEqual({
+        type: "tasks.load",
+        payload: { scope: "all" },
+      });
+
+      return {
+        resolved: true,
+        clear: true,
+      };
+    });
+
+    expect(resolved).toBe(true);
+    expect(store.getDeadLetters()).toHaveLength(0);
+  });
+
   it("preserves correlated typing on broker replay methods", () => {
     const history: readonly StoreHistoryEntry<ReplayStoreData>[] =
       store.getHistory();

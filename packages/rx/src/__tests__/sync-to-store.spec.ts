@@ -50,6 +50,13 @@ describe("syncToStore", () => {
     expect(state.status).toBe("Error");
     expect(state.isLoading).toBe(false);
     expect(state.errors).toEqual([{ code: "500", message: "Server error" }]);
+    expect(store.getDeadLetters()).toMatchObject([
+      {
+        error: "Server error",
+        httpStatus: 500,
+        httpMessage: "Server error",
+      },
+    ]);
   });
 
   it("should complete after first emission by default", () => {

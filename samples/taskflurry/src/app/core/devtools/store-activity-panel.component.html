@@ -90,8 +90,18 @@
               </div>
               <div class="sap__msg-bottom">
                 <span class="sap__msg-meta">#{{ msg.id }} &middot; {{ formatTime(msg.createdAt) }}</span>
-                @if (msg.status === 'acknowledged') {
-                  <button class="sap__msg-action" [attr.data-testid]="'activity-replay-' + msg.id" (click)="replay(msg.id)">Replay</button>
+                @if (deadLetterMessage(msg); as deadLetter) {
+                  <span class="sap__msg-error" [attr.data-testid]="'activity-dead-letter-error-' + msg.id">
+                    <span class="sap__msg-error-summary">{{ deadLetter.summary }}</span>
+                    @if (deadLetter.summary !== deadLetter.detail) {
+                      <span class="sap__msg-error-detail">{{ deadLetter.detail }}</span>
+                    }
+                  </span>
+                }
+                @if (msg.status === 'acknowledged' || msg.deadLetter) {
+                  <button class="sap__msg-action" [attr.data-testid]="'activity-replay-' + msg.id" (click)="replay(msg)">
+                    {{ msg.deadLetter ? 'Retry' : 'Replay' }}
+                  </button>
                 }
               </div>
             </div>

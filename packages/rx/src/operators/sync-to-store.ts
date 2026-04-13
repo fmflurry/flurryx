@@ -1,10 +1,11 @@
 import { finalize, Observable, take, tap } from "rxjs";
-import type { BaseStore, IStore } from "@flurryx/store";
+import type { BaseStore, IStore, StoreDeadLetterCommand } from "@flurryx/store";
 import type { ResourceState } from "@flurryx/core";
 import {
   defaultErrorNormalizer,
   type ErrorNormalizer,
 } from "../error/error-normalizer";
+import { createDeadLetterMeta } from "../error/dead-letter-meta";
 
 /**
  * Options for {@link syncToStore}.
@@ -26,10 +27,12 @@ export interface SyncToStoreOptions {
    * @default defaultErrorNormalizer
    */
   errorNormalizer?: ErrorNormalizer;
+  /** Optional replayable command metadata attached to DLQ entries created from HTTP errors. */
+  deadLetterCommand?: StoreDeadLetterCommand;
 }
 
 interface SyncToStoreRuntimeStore {
-  update(key: PropertyKey, newState: unknown): void;
+  update(key: PropertyKey, newState: unknown, options?: unknown): void;
 }
 
 /**
@@ -116,6 +119,8 @@ export function syncToStore(
             isLoading: false,
             status: "Error",
             errors: normalizeError(error),
+          }, {
+            deadLetter: createDeadLetterMeta(error, options.deadLetterCommand),
           });
         },
       })

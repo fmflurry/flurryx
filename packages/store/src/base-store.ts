@@ -1,6 +1,12 @@
 import { signal, type Signal, WritableSignal } from "@angular/core";
 import { ResourceState, type KeyedResourceKey } from "@flurryx/core";
-import type { IStore, StoreDataShape, StoreKey, StoreOptions } from "./types";
+import type {
+  IStore,
+  StoreDataShape,
+  StoreKey,
+  StoreOptions,
+  StoreUpdateOptions,
+} from "./types";
 import { cloneValue } from "./store-clone";
 import {
   createStoreHistory,
@@ -84,6 +90,12 @@ export abstract class BaseStore<
   /** @inheritDoc */
   readonly replayDeadLetters = (): number =>
     this.historyDriver.replayDeadLetters();
+
+  /** @inheritDoc */
+  readonly replayDeadLetterCommand = (
+    id: number,
+    resolver: Parameters<StoreHistoryDriver<TData>["replayDeadLetterCommand"]>[1]
+  ): Promise<boolean> => this.historyDriver.replayDeadLetterCommand(id, resolver);
 
   /** @inheritDoc */
   readonly getCurrentIndex = () => this.historyDriver.getCurrentIndex();
@@ -197,7 +209,7 @@ export abstract class BaseStore<
   }
 
   /**
-   * Registers a callback fired after every `update` or `clear` on the given slot.
+   * Registers a callback fired after every state change on the given slot.
    *
    * @param key - The slot to watch.
    * @param callback - Receives the new state and the previous state.
@@ -243,9 +255,13 @@ export abstract class BaseStore<
    * @param key - The slot to update.
    * @param newState - Partial state to merge (e.g. `{ data: newData, status: 'Success' }`).
    */
-  update<K extends StoreKey<TData>>(key: K, newState: Partial<TData[K]>): void {
+  update<K extends StoreKey<TData>>(
+    key: K,
+    newState: Partial<TData[K]>,
+    options?: StoreUpdateOptions
+  ): void {
     this.historyDriver.publish(
-      createUpdateMessage<TData, K>(key, cloneValue(newState))
+      createUpdateMessage<TData, K>(key, cloneValue(newState), options)
     );
   }
 

@@ -5,6 +5,7 @@ import type {
   StoreSnapshot,
   StoreMessageStatus,
 } from "./store-messages";
+import type { StoreDeadLetterCommand, StoreDeadLetterMeta } from "./store-dead-letter";
 import {
   INVALID_HISTORY_INDEX_ERROR,
   INVALID_HISTORY_MESSAGE_ID_ERROR,
@@ -102,8 +103,19 @@ export interface StoreDeadLetterEntry<
   readonly attempts: number;
   /** Last acknowledgement error captured for this dead letter. */
   readonly error: string;
+  /** HTTP status captured with the dead letter when available. */
+  readonly httpStatus: number | null;
+  /** HTTP message captured with the dead letter when available. */
+  readonly httpMessage: string | null;
+  /** Replayable command metadata captured with the dead letter when available. */
+  readonly command: StoreDeadLetterCommand | null;
   /** Timestamp of the most recent failure. */
   readonly failedAt: number;
+}
+
+export interface DeadLetterCommandResolverResult {
+  readonly resolved: boolean;
+  readonly clear: boolean;
 }
 
 /**
@@ -221,6 +233,14 @@ export interface StoreHistory<
    */
   replayDeadLetters(): number;
 
+  /** Resolves one dead-letter entry by rerunning its originating command. */
+  replayDeadLetterCommand(
+    id: number,
+    resolver: (
+      entry: Readonly<StoreDeadLetterEntry<TData, TKey>>
+    ) => Promise<DeadLetterCommandResolverResult>
+  ): Promise<boolean>;
+
   /** Returns the currently restored history index used by snapshot navigation. */
   getCurrentIndex(): number;
 
@@ -302,13 +322,36 @@ function toDeadLetterEntry<
   TData extends StoreDataShape<TData>,
   TKey extends StoreKey<TData>
 >(record: StoreMessageRecord<TData, TKey>): StoreDeadLetterEntry<TData, TKey> {
+  const deadLetter = record.deadLetter;
   return {
     id: record.id,
     message: cloneValue(record.message),
     attempts: record.attempts,
-    error: record.error ?? MESSAGE_NOT_ACKNOWLEDGED_ERROR,
+    error:
+      deadLetter?.error ?? record.error ?? MESSAGE_NOT_ACKNOWLEDGED_ERROR,
+    httpStatus: deadLetter?.httpStatus ?? null,
+    httpMessage: deadLetter?.httpMessage ?? null,
+    command: deadLetter?.command ?? null,
     failedAt: record.lastAttemptedAt ?? record.createdAt,
   };
+}
+
+function getMessageDeadLetterMeta<
+  TData extends StoreDataShape<TData>,
+  TKey extends StoreKey<TData>
+>(message: StoreMessage<TData, TKey>): StoreDeadLetterMeta | null {
+  if (message.type !== "update" || message.deadLetter === undefined) {
+    return null;
+  }
+
+  return cloneValue(message.deadLetter);
+}
+
+function hasDeadLetterRecord<
+  TData extends StoreDataShape<TData>,
+  TKey extends StoreKey<TData>
+>(record: StoreMessageRecord<TData, TKey>): boolean {
+  return record.status === "dead-letter" || record.deadLetter !== null;
 }
 
 function areValuesEquivalent(
@@ -438,6 +481,7 @@ function areStoreMessageRecordsEquivalent<
     sourceRecord.lastAttemptedAt === cachedRecord.lastAttemptedAt &&
     sourceRecord.acknowledgedAt === cachedRecord.acknowledgedAt &&
     sourceRecord.error === cachedRecord.error &&
+    areValuesEquivalent(sourceRecord.deadLetter, cachedRecord.deadLetter) &&
     areValuesEquivalent(sourceRecord.message, cachedRecord.message)
   );
 }
@@ -631,6 +675,7 @@ export function createStoreHistory<
     error: string | null,
     attemptedAt: number
   ): StoreMessageRecord<TData, TKey> {
+    const messageDeadLetter = getMessageDeadLetterMeta(record.message);
     const nextRecord: StoreMessageRecord<TData, TKey> = {
       ...record,
       message: cloneValue(record.message),
@@ -640,6 +685,13 @@ export function createStoreHistory<
       acknowledgedAt:
         status === "acknowledged" ? attemptedAt : record.acknowledgedAt,
       error,
+      deadLetter:
+        messageDeadLetter ??
+        (status === "dead-letter"
+          ? {
+              error: error ?? MESSAGE_NOT_ACKNOWLEDGED_ERROR,
+            }
+          : null),
     };
 
     messageChannel.saveMessage(nextRecord);
@@ -730,7 +782,7 @@ export function createStoreHistory<
 
   function replayDeadLetter(id: number): boolean {
     const record = messageChannel.getMessage(id);
-    if (!record || record.status !== "dead-letter") {
+    if (!record || !hasDeadLetterRecord(record)) {
       return false;
     }
 
@@ -738,9 +790,9 @@ export function createStoreHistory<
   }
 
   function replayDeadLetters(): number {
-    const ids = messageChannel
+      const ids = messageChannel
       .getMessages()
-      .filter((record) => record.status === "dead-letter")
+      .filter((record) => hasDeadLetterRecord(record))
       .map((record) => record.id);
     let acknowledgedCount = 0;
 
@@ -751,6 +803,41 @@ export function createStoreHistory<
     });
 
     return acknowledgedCount;
+  }
+
+  async function replayDeadLetterCommand(
+    id: number,
+    resolver: (
+      entry: Readonly<StoreDeadLetterEntry<TData, TKey>>
+    ) => Promise<DeadLetterCommandResolverResult>
+  ): Promise<boolean> {
+    const record = messageChannel.getMessage(id);
+    if (!record || !hasDeadLetterRecord(record)) {
+      return false;
+    }
+
+    const entry = toDeadLetterEntry(record);
+    const result = await resolver(entry);
+    if (!result.resolved) {
+      return false;
+    }
+
+    if (!result.clear) {
+      return true;
+    }
+
+    const clearedRecord: StoreMessageRecord<TData, TKey> = {
+      ...record,
+      deadLetter: null,
+      error: null,
+    };
+    messageChannel.saveMessage(clearedRecord);
+    messageCollection = upsertStableReadonlyCollectionItem({
+      items: messageCollection,
+      item: cloneValue(clearedRecord),
+    });
+    notifyVersion();
+    return true;
   }
 
   const historySignal = computed(() => {
@@ -822,11 +909,12 @@ export function createStoreHistory<
     getDeadLetters() {
       return messageChannel
         .getMessages()
-        .filter((record) => record.status === "dead-letter")
+        .filter((record) => hasDeadLetterRecord(record))
         .map((record) => toDeadLetterEntry(record));
     },
     replayDeadLetter,
     replayDeadLetters,
+    replayDeadLetterCommand,
     getCurrentIndex() {
       return currentIndex;
     },

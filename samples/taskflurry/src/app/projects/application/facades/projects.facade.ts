@@ -7,6 +7,7 @@ import { GetProjectsUseCase } from '../use-cases/get-projects.use-case';
 import { GetProjectTasksUseCase } from '../use-cases/get-project-tasks.use-case';
 import { DeleteProjectTaskUseCase } from '../use-cases/delete-project-task.use-case';
 import { SnackbarService } from '../../../core/snackbar/snackbar.service';
+import { asDeadLetterCommand } from '../../../core/devtools/store-activity-command';
 
 @Injectable()
 export class ProjectsFacade {
@@ -31,12 +32,26 @@ export class ProjectsFacade {
   @SkipIfCached('PROJECTS', (instance) => instance.store)
   @Loading('PROJECTS', (instance) => instance.store)
   loadProjects(): void {
-    this.getProjectsUseCase.execute().pipe(syncToStore(this.store, 'PROJECTS')).subscribe();
+    this.getProjectsUseCase
+      .execute()
+      .pipe(
+        syncToStore(this.store, 'PROJECTS', {
+          deadLetterCommand: asDeadLetterCommand({ type: 'projects.load' }),
+        })
+      )
+      .subscribe();
   }
 
   @Loading('TASKS', (instance) => instance.store)
   loadTasks(): void {
-    this.getProjectTasksUseCase.execute().pipe(syncToStore(this.store, 'TASKS')).subscribe();
+    this.getProjectTasksUseCase
+      .execute()
+      .pipe(
+        syncToStore(this.store, 'TASKS', {
+          deadLetterCommand: asDeadLetterCommand({ type: 'projects.tasks.load' }),
+        })
+      )
+      .subscribe();
   }
 
   selectProject(project: Project): void {

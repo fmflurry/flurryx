@@ -6,7 +6,7 @@ import {
   createKeyedResourceData,
   isAnyKeyLoading,
 } from "@flurryx/core";
-import type { StoreDataShape, StoreKey } from "./types";
+import type { StoreDataShape, StoreKey, StoreUpdateOptions } from "./types";
 import type { StoreMessage, StoreSnapshot } from "./store-messages";
 import { cloneValue, createSnapshotRestorePatch } from "./store-clone";
 
@@ -339,8 +339,17 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
 export function createUpdateMessage<
   TData extends StoreDataShape<TData>,
   K extends StoreKey<TData>
->(key: K, state: Partial<TData[K]>): StoreMessage<TData> {
-  return { type: "update", key, state } as StoreMessage<TData>;
+>(
+  key: K,
+  state: Partial<TData[K]>,
+  options?: StoreUpdateOptions
+): StoreMessage<TData> {
+  return {
+    type: "update",
+    key,
+    state,
+    deadLetter: options?.deadLetter,
+  } as StoreMessage<TData>;
 }
 
 export function createClearMessage<

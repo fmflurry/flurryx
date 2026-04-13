@@ -1,5 +1,6 @@
 import type { StoreDataShape, StoreKey } from "./types";
 import type { StoreMessage, StoreMessageStatus } from "./store-messages";
+import type { StoreDeadLetterMeta } from "./store-dead-letter";
 import { cloneValue } from "./store-clone";
 
 /**
@@ -28,6 +29,8 @@ export interface StoreMessageRecord<
   readonly acknowledgedAt: number | null;
   /** Last recorded delivery error, or `null` when the latest attempt succeeded. */
   readonly error: string | null;
+  /** Optional dead-letter metadata attached by the publisher. */
+  readonly deadLetter: StoreDeadLetterMeta | null;
 }
 
 /** Minimal string-based storage adapter used by storage-backed message channels. */
@@ -308,6 +311,7 @@ export function createInitialStoreMessageRecord<
     lastAttemptedAt: null,
     acknowledgedAt: null,
     error: null,
+    deadLetter: null,
   };
 }
 

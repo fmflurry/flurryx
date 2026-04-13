@@ -287,6 +287,28 @@ describe("BaseStore", () => {
       c2();
     });
 
+    it("should trigger callback on startLoading and stopLoading", () => {
+      const callback = vi.fn();
+      const cleanup = store.onUpdate(TestStoreEnum.ITEM_ONE, callback);
+
+      store.startLoading(TestStoreEnum.ITEM_ONE);
+      store.stopLoading(TestStoreEnum.ITEM_ONE);
+
+      expect(callback).toHaveBeenCalledTimes(2);
+      expect(callback).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ isLoading: true, status: undefined }),
+        expect.objectContaining({ isLoading: false }),
+      );
+      expect(callback).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ isLoading: false }),
+        expect.objectContaining({ isLoading: true }),
+      );
+
+      cleanup();
+    });
+
     it("should handle multiple callbacks independently", () => {
       const cb1 = vi.fn();
       const cb2 = vi.fn();

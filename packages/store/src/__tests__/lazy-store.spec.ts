@@ -217,6 +217,27 @@ describe("LazyStore", () => {
     );
   });
 
+  it("should notify onUpdate on startLoading() and stopLoading()", () => {
+    const store = new LazyStore<TestData>();
+    const callback = vi.fn();
+
+    store.onUpdate("count", callback);
+    store.startLoading("count");
+    store.stopLoading("count");
+
+    expect(callback).toHaveBeenCalledTimes(2);
+    expect(callback).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ isLoading: true, status: undefined }),
+      expect.objectContaining({ isLoading: false }),
+    );
+    expect(callback).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ isLoading: false }),
+      expect.objectContaining({ isLoading: true }),
+    );
+  });
+
   it("should support multiple callbacks for the same key", () => {
     const store = new LazyStore<TestData>();
     const cb1 = vi.fn();

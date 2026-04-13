@@ -22,6 +22,7 @@ export {
   Store,
   clearAllStores,
   mirrorKey,
+  deriveKey,
   collectKeyed,
   cloneValue,
   createSnapshotRestorePatch,
@@ -33,6 +34,7 @@ export {
 } from "@flurryx/store";
 export type {
   MirrorOptions,
+  DeriveOptions,
   CollectKeyedOptions,
   StoreOptions,
   StoreDeadLetterEntry,

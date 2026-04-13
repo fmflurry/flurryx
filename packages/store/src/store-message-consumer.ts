@@ -106,6 +106,7 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
 
   function applyStartLoading<K extends StoreKey<TData>>(key: K): boolean {
     const sig = signals.getOrCreate(key);
+    const previousState = sig();
     sig.update(
       (state) =>
         ({
@@ -115,11 +116,15 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
           errors: undefined,
         } as TData[K])
     );
+
+    const nextState = sig();
+    notifier.notify(key, nextState, previousState);
     return true;
   }
 
   function applyStopLoading<K extends StoreKey<TData>>(key: K): boolean {
     const sig = signals.getOrCreate(key);
+    const previousState = sig();
     sig.update(
       (state) =>
         ({
@@ -127,6 +132,9 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
           isLoading: false,
         } as TData[K])
     );
+
+    const nextState = sig();
+    notifier.notify(key, nextState, previousState);
     return true;
   }
 

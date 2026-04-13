@@ -151,9 +151,9 @@ export class InvoiceFacade {
 | `clearAllStores()` | Every tracked store instance | Logout, tenant switch, full app cache reset |
 | `clearKeyedOne(key, resourceKey)` | Single entity in a keyed slot | Deleting or invalidating one cached item |
 
-## Store Mirroring
+## Store Composition
 
-The store builder supports `.mirror()`, `.mirrorSelf()`, and `.mirrorKeyed()` for declarative synchronization.
+The store builder supports `.mirror()`, `.mirrorSelf()`, `.derive()`, `.deriveSelf()`, and `.mirrorKeyed()` for declarative synchronization.
 
 Use `.mirrorSelf(sourceKey, targetKey)` when two slots inside the same store should stay in sync:
 
@@ -168,7 +168,54 @@ export const SessionStore = Store.for<SessionStoreConfig>()
   .build();
 ```
 
-See the [root README](../../README.md#store-mirroring) for full mirroring documentation and more examples.
+Use `.derive()` when a target slot should be computed from another store's slot while still mirroring loading, status, and errors from the source:
+
+```typescript
+interface CompanyStoreConfig {
+  COMPANIES: Company[];
+}
+
+export const CompanyStore = Store.for<CompanyStoreConfig>().build();
+
+interface SessionStoreConfig {
+  ONLY_COMPANY: Company | null;
+  SINGLE: boolean;
+}
+
+export const SessionStore = Store.for<SessionStoreConfig>()
+  .derive(CompanyStore, 'COMPANIES', 'ONLY_COMPANY', {
+    mapData: (companies) =>
+      companies?.length === 1 ? (companies[0] ?? null) : null,
+  })
+  .derive(CompanyStore, 'COMPANIES', 'SINGLE', {
+    mapData: (companies) => (companies?.length ?? 0) === 1,
+  })
+  .build();
+```
+
+Use `.deriveSelf()` when the source of truth lives in the same store:
+
+```typescript
+interface InvalidConfigStoreConfig {
+  COMPANIES: Company[];
+  ONLY_COMPANY: Company | null;
+  SINGLE: boolean;
+}
+
+export const InvalidConfigStore = Store.for<InvalidConfigStoreConfig>()
+  .deriveSelf('COMPANIES', 'ONLY_COMPANY', {
+    mapData: (companies) =>
+      companies?.length === 1 ? (companies[0] ?? null) : null,
+  })
+  .deriveSelf('COMPANIES', 'SINGLE', {
+    mapData: (companies) => (companies?.length ?? 0) === 1,
+  })
+  .build();
+```
+
+Derived targets update whenever the source state changes, including loading transitions and store history restore operations.
+
+See the [root README](../../README.md#store-mirroring) for full composition documentation and more examples.
 
 ## License
 

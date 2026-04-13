@@ -223,8 +223,8 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 
 ### Store Composition
 
-- **Mirroring** — `.mirror()`, `.mirrorSelf()`, `.mirrorKeyed()`
-- **mirrorKey / collectKeyed** — imperative wiring with cleanup
+- **Mirroring & derivation** — `.mirror()`, `.mirrorSelf()`, `.derive()`, `.deriveSelf()`, `.mirrorKeyed()`
+- **mirrorKey / deriveKey / collectKeyed** — imperative wiring with cleanup
 
 </td>
 </tr>
@@ -265,6 +265,8 @@ flurryx stays small on purpose: a typed store builder, a small RxJS bridge, cach
 - [Store Mirroring](#store-mirroring)
   - [Builder .mirror()](#builder-mirror)
   - [Builder .mirrorSelf()](#builder-mirrorself)
+  - [Builder .derive()](#builder-derive)
+  - [Builder .deriveSelf()](#builder-deriveself)
   - [Builder .mirrorKeyed()](#builder-mirrorkeyed)
   - [mirrorKey](#mirrorkey)
   - [collectKeyed](#collectkeyed)
@@ -1165,7 +1167,7 @@ When building session or aggregation stores that combine state from multiple fea
 ```
 
 ```typescript
-import { Store, mirrorKey, collectKeyed } from "flurryx";
+import { Store, mirrorKey, deriveKey, collectKeyed } from "flurryx";
 ```
 
 ### Builder .mirror()
@@ -1274,6 +1276,59 @@ export const SessionStore = Store.for<SessionStoreConfig>()
 ```
 
 `.mirrorSelf()` is available on all builder styles. For fluent builders, declare both slots first, then chain `.mirrorSelf(sourceKey, targetKey)` before `.build()`.
+
+### Builder .derive()
+
+Use `.derive()` when the target slot should remain a first-class store resource, but its `data` should be computed from another store's slot. The target automatically mirrors the source slot's `isLoading`, `status`, and `errors`, while `mapData` computes the target `data`.
+
+```typescript
+interface CompanyStoreConfig {
+  COMPANIES: Company[];
+}
+
+export const CompanyStore = Store.for<CompanyStoreConfig>().build();
+
+interface InvalidConfigStoreConfig {
+  ONLY_COMPANY: Company | null;
+  SINGLE: boolean;
+}
+
+export const InvalidConfigStore = Store.for<InvalidConfigStoreConfig>()
+  .derive(CompanyStore, "COMPANIES", "ONLY_COMPANY", {
+    mapData: (companies) =>
+      companies?.length === 1 ? (companies[0] ?? null) : null,
+  })
+  .derive(CompanyStore, "COMPANIES", "SINGLE", {
+    mapData: (companies) => (companies?.length ?? 0) === 1,
+  })
+  .build();
+```
+
+Like builder mirroring, `.derive()` is available on all builder styles. Derived targets react to normal updates, loading transitions, and history restore operations.
+
+### Builder .deriveSelf()
+
+Use `.deriveSelf()` when the source of truth already lives in the same store and other slots should be derived from it.
+
+```typescript
+interface InvalidConfigStoreConfig {
+  COMPANIES: Company[];
+  ONLY_COMPANY: Company | null;
+  SINGLE: boolean;
+}
+
+export const InvalidConfigStore = Store.for<InvalidConfigStoreConfig>()
+  .deriveSelf("COMPANIES", "ONLY_COMPANY", {
+    mapData: (companies) =>
+      companies?.length === 1 ? (companies[0] ?? null) : null,
+  })
+  .deriveSelf("COMPANIES", "SINGLE", {
+    mapData: (companies) => (companies?.length ?? 0) === 1,
+  })
+  .build();
+```
+
+This gives you store-native derived resources without moving the derived values into the facade layer.
 
 ### Builder .mirrorKeyed()
 
@@ -1433,6 +1488,23 @@ export class SessionStore {
 
 Everything — loading flags, data, status, errors — is mirrored automatically. No manual `onUpdate` + cleanup boilerplate.
 
+### deriveKey
+
+Derives one resource key from another while keeping the target as a real store slot. Unlike `mirrorKey`, the target `data` is computed through `mapData`, while `isLoading`, `status`, and `errors` are mirrored from the source.
+
+```typescript
+deriveKey(companyStore, "COMPANIES", invalidConfigStore, "SINGLE", {
+  mapData: (companies) => (companies?.length ?? 0) === 1,
+});
+
+deriveKey(companyStore, "COMPANIES", invalidConfigStore, "ONLY_COMPANY", {
+  mapData: (companies) =>
+    companies?.length === 1 ? (companies[0] ?? null) : null,
+});
+```
+
+Use `deriveKey` when you need imperative setup or manual cleanup. Prefer the builder `.derive()` and `.deriveSelf()` APIs when the wiring is static.
+
 ### collectKeyed
 
 Accumulates single-entity fetches into a `KeyedResourceData` cache on a target store. Each time the source emits a successful entity, it is merged into the target's keyed map by a user-provided `extractId` function.
@@ -1575,7 +1647,7 @@ If your tool is not skill-aware, you can still point it at `skills/flurryx/SKILL
 - `@SkipIfCached` usage rules and decorator ordering with `@Loading`
 - Component patterns (read signals, never subscribe manually)
 - Keyed resources for per-entity caching
-- Store mirroring (`mirror`, `mirrorSelf`, `mirrorKeyed`)
+- Store composition (`mirror`, `mirrorSelf`, `derive`, `deriveSelf`, `mirrorKeyed`)
 - Message channels and persistence
 - Time travel, replay, and dead-letter recovery
 - Error normalization (default, HTTP, custom)

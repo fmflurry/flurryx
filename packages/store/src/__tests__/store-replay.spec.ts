@@ -312,8 +312,8 @@ describe("built-in store broker history", () => {
       .data as KeyedResourceData<string, { id: string; text: string }>;
 
     expect(store.get(ReplayStoreEnum.MESSAGE)().isLoading).toBe(false);
-    expect(keyedData.entities["m-1"]).toBeUndefined();
-    expect(keyedData.isLoading["m-2"]).toBe(true);
+    expect(keyedData["m-1"]).toBeUndefined();
+    expect(keyedData["m-2"]?.isLoading).toBe(true);
     expect(store.get(ReplayStoreEnum.COUNTER)().data).toBeUndefined();
 
     store.clearAll();
@@ -341,7 +341,7 @@ describe("built-in store broker history", () => {
 
     const keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)()
       .data as KeyedResourceData<string, { id: string; text: string }>;
-    expect(keyedData.entities["m-1"]).toBeUndefined();
+    expect(keyedData["m-1"]).toBeUndefined();
 
     const clearKeyedMsgId = store.getMessages().at(-1)!.id;
     expect(store.replay(clearKeyedMsgId)).toBe(1);
@@ -364,8 +364,8 @@ describe("built-in store broker history", () => {
 
     const keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)()
       .data as KeyedResourceData<string, { id: string; text: string }>;
-    expect(keyedData.entities["m-1"]).toBeUndefined();
-    expect(keyedData.entities["m-2"]).toBeUndefined();
+    expect(keyedData["m-1"]).toBeUndefined();
+    expect(keyedData["m-2"]).toBeUndefined();
   });
 
   it("persists messages in a storage-backed channel across store instances", () => {
@@ -531,24 +531,24 @@ describe("built-in store broker history", () => {
     store.restoreStoreAt(1);
 
     let keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)().data;
-    expect(keyedData?.entities["m-1"]).toEqual({ id: "m-1", text: "hello" });
-    expect(keyedData?.isLoading["m-2"]).toBeUndefined();
+    expect(keyedData?.["m-1"]?.data).toEqual({ id: "m-1", text: "hello" });
+    expect(keyedData?.["m-2"]?.isLoading).toBeUndefined();
 
     expect(store.redo()).toBe(true);
     keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)().data;
-    expect(keyedData?.isLoading["m-2"]).toBe(true);
+    expect(keyedData?.["m-2"]?.isLoading).toBe(true);
 
     expect(store.undo()).toBe(true);
     keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)().data;
-    expect(keyedData?.isLoading["m-2"]).toBeUndefined();
+    expect(keyedData?.["m-2"]?.isLoading).toBeUndefined();
 
     store.restoreStoreAt(0);
     expect(store.get(ReplayStoreEnum.KEYED_MESSAGES)().data).toBeUndefined();
 
     expect(store.replay(replayIds)).toBe(2);
     keyedData = store.get(ReplayStoreEnum.KEYED_MESSAGES)().data;
-    expect(keyedData?.entities["m-1"]).toEqual({ id: "m-1", text: "hello" });
-    expect(keyedData?.isLoading["m-2"]).toBe(true);
+    expect(keyedData?.["m-1"]?.data).toEqual({ id: "m-1", text: "hello" });
+    expect(keyedData?.["m-2"]?.isLoading).toBe(true);
   });
 
   it("restores snapshots with a single update notification per key", () => {
@@ -795,10 +795,10 @@ describe("built-in store broker history", () => {
         .data as KeyedResourceData<string, { id: string; text: string }>;
 
       // Should only have m-1 from index 1
-      expect(Object.keys(keyedData.entities)).toEqual(["m-1"]);
-      expect(keyedData.entities["m-1"]?.text).toBe("first");
+      expect(Object.keys(keyedData)).toEqual(["m-1"]);
+      expect(keyedData["m-1"]?.data?.text).toBe("first");
       // m-2 should not exist
-      expect(keyedData.entities["m-2"]).toBeUndefined();
+      expect(keyedData["m-2"]).toBeUndefined();
     });
 
     it("restores custom resource-state fields for the key", () => {

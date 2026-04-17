@@ -40,39 +40,19 @@ export class TaskDetailComponent implements OnInit {
   });
 
   protected readonly task = computed(() => {
-    const state = this.detailState();
-    const data = state.data;
-    if (!data) {
-      return undefined;
-    }
-    return data.entities[this.taskId];
+    return this.detailState().data?.[this.taskId]?.data;
   });
 
   protected readonly isLoading = computed(() => {
-    const state = this.detailState();
-    const data = state.data;
-    if (!data) {
-      return state.isLoading ?? false;
-    }
-    return data.isLoading[this.taskId] ?? false;
+    return this.detailState().data?.[this.taskId]?.isLoading ?? false;
   });
 
   protected readonly hasError = computed(() => {
-    const state = this.detailState();
-    const data = state.data;
-    if (!data) {
-      return state.status === 'Error';
-    }
-    return data.status[this.taskId] === 'Error';
+    return this.detailState().data?.[this.taskId]?.status === 'Error';
   });
 
   protected readonly errors = computed(() => {
-    const state = this.detailState();
-    const data = state.data;
-    if (!data) {
-      return state.errors ?? [];
-    }
-    return data.errors[this.taskId] ?? [];
+    return this.detailState().data?.[this.taskId]?.errors ?? [];
   });
 
   ngOnInit(): void {

@@ -58,10 +58,15 @@ export type {
   ClearAllStoreMessage,
   StartLoadingStoreMessage,
   StopLoadingStoreMessage,
-  UpdateKeyedOneStoreMessage,
-  ClearKeyedOneStoreMessage,
-  StartKeyedLoadingStoreMessage,
-} from "@flurryx/store";
+   UpdateKeyedOneStoreMessage,
+   ClearKeyedOneStoreMessage,
+   StartKeyedLoadingStoreMessage,
+   EnsureKeyedSlotStoreMessage,
+   KeyedResourceState,
+   KeyedStoreSignal,
+   StoreSignal,
+   ValueOrSignal,
+ } from "@flurryx/store";
 
 // @flurryx/rx
 export {

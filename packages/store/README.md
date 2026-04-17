@@ -61,6 +61,8 @@ export const MyStore = Store.for(Enum)
 
 For slots holding `KeyedResourceData<TKey, TValue>`:
 
+When keyed fetches use `syncToKeyedStore(..., resourceKey)`, keyed slot is bootstrapped on subscribe so per-key loading state exists before first response.
+
 | Method | Description |
 |---|---|
 | `updateKeyedOne(key, resourceKey, entity)` | Merges one entity into a keyed slot |

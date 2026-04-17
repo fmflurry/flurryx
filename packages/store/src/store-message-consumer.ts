@@ -2,11 +2,18 @@ import type { WritableSignal } from "@angular/core";
 import {
   type ResourceState,
   type KeyedResourceKey,
+  type KeyedResourceData,
   isKeyedResourceData,
   createKeyedResourceData,
-  isAnyKeyLoading,
 } from "@flurryx/core";
-import type { StoreDataShape, StoreKey, StoreUpdateOptions } from "./types";
+import type {
+  KeyedResourceEntryKey,
+  KeyedResourceEntryValue,
+  KeyedStoreKey,
+  StoreDataShape,
+  StoreKey,
+  StoreUpdateOptions,
+} from "./types";
 import type { StoreMessage, StoreSnapshot } from "./store-messages";
 import { cloneValue, createSnapshotRestorePatch } from "./store-clone";
 
@@ -52,6 +59,20 @@ export interface StoreMessageConsumer<TData extends StoreDataShape<TData>> {
     snapshotState: TData[K]
   ): void;
   createSnapshot(): StoreSnapshot<TData>;
+}
+
+type KeyedResourceRecord = Partial<
+  Record<KeyedResourceKey, ResourceState<unknown>>
+>;
+
+function toKeyedResourceRecord(
+  data: KeyedResourceData<KeyedResourceKey, unknown>
+): KeyedResourceRecord {
+  return data as unknown as KeyedResourceRecord;
+}
+
+function hasAnyKeyLoading(data: KeyedResourceRecord): boolean {
+  return Object.values(data).some((entry) => entry?.isLoading === true);
 }
 
 /**
@@ -138,39 +159,38 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
     return true;
   }
 
-  function applyUpdateKeyedOne<K extends StoreKey<TData>>(
+  function applyUpdateKeyedOne<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey,
-    entity: unknown
+    resourceKey: KeyedResourceEntryKey<TData, K>,
+    entity: KeyedResourceEntryValue<TData, K>
   ): boolean {
     const sig = signals.getOrCreate(key);
     const state = sig();
     const data = isKeyedResourceData(state.data)
-      ? state.data
-      : createKeyedResourceData();
+      ? toKeyedResourceRecord(state.data)
+      : toKeyedResourceRecord(createKeyedResourceData());
 
-    const nextErrors = { ...data.errors };
-    delete nextErrors[resourceKey];
-
-    const nextData = {
+    const nextData: KeyedResourceRecord = {
       ...data,
-      entities: { ...data.entities, [resourceKey]: entity },
-      isLoading: { ...data.isLoading, [resourceKey]: false },
-      status: { ...data.status, [resourceKey]: "Success" as const },
-      errors: nextErrors,
+      [resourceKey]: {
+        data: entity,
+        isLoading: false,
+        status: "Success" as const,
+        errors: undefined,
+      },
     };
 
     return applyUpdate(key, {
       data: nextData as unknown,
-      isLoading: isAnyKeyLoading(nextData.isLoading),
+      isLoading: hasAnyKeyLoading(nextData),
       status: undefined,
       errors: undefined,
     } as Partial<TData[K]>);
   }
 
-  function applyClearKeyedOne<K extends StoreKey<TData>>(
+  function applyClearKeyedOne<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey
+    resourceKey: KeyedResourceEntryKey<TData, K>
   ): boolean {
     const sig = signals.getOrCreate(key);
     const previousState = sig();
@@ -179,27 +199,11 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
       return true;
     }
 
-    const data = state.data;
-
-    const nextEntities = { ...data.entities };
-    delete nextEntities[resourceKey];
-
-    const nextIsLoading = { ...data.isLoading };
-    delete nextIsLoading[resourceKey];
-
-    const nextStatus = { ...data.status };
-    delete nextStatus[resourceKey];
-
-    const nextErrors = { ...data.errors };
-    delete nextErrors[resourceKey];
-
+    const data = toKeyedResourceRecord(state.data);
     const nextData = {
       ...data,
-      entities: nextEntities,
-      isLoading: nextIsLoading,
-      status: nextStatus,
-      errors: nextErrors,
-    };
+    } as KeyedResourceRecord;
+    delete nextData[resourceKey];
 
     sig.update(
       (prev) =>
@@ -207,7 +211,7 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
           ...prev,
           data: nextData as unknown,
           status: undefined,
-          isLoading: isAnyKeyLoading(nextIsLoading),
+          isLoading: hasAnyKeyLoading(nextData),
           errors: undefined,
         } as TData[K])
     );
@@ -217,35 +221,33 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
     return true;
   }
 
-  function applyStartKeyedLoading<K extends StoreKey<TData>>(
+  function applyStartKeyedLoading<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey
+    resourceKey: KeyedResourceEntryKey<TData, K>
   ): boolean {
     const sig = signals.getOrCreate(key);
-    const state = sig();
-    if (!isKeyedResourceData(state.data)) {
+    const previousState = sig();
+    const state = previousState as ResourceState<unknown>;
+
+    if (state.data !== undefined && !isKeyedResourceData(state.data)) {
       return applyStartLoading(key);
     }
 
-    const previousState = state as TData[K];
-    const data = state.data;
-
-    const nextIsLoading = {
-      ...data.isLoading,
-      [resourceKey]: true,
-    } as typeof data.isLoading;
-
-    const nextStatus: typeof data.status = { ...data.status };
-    delete nextStatus[resourceKey];
-
-    const nextErrors: typeof data.errors = { ...data.errors };
-    delete nextErrors[resourceKey];
-
-    const nextData = {
+    const data = isKeyedResourceData(state.data)
+      ? toKeyedResourceRecord(state.data)
+      : toKeyedResourceRecord(createKeyedResourceData());
+    const currentResourceState = data[resourceKey];
+    const nextResourceState =
+      currentResourceState ??
+      (createDefaultState<KeyedResourceEntryValue<TData, K>>() as ResourceState<unknown>);
+    const nextData: KeyedResourceRecord = {
       ...data,
-      isLoading: nextIsLoading,
-      status: nextStatus,
-      errors: nextErrors,
+      [resourceKey]: {
+        ...nextResourceState,
+        isLoading: true,
+        status: undefined,
+        errors: undefined,
+      },
     };
 
     sig.update(
@@ -254,8 +256,49 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
           ...previous,
           data: nextData,
           status: undefined,
-          isLoading: isAnyKeyLoading(nextIsLoading),
+          isLoading: hasAnyKeyLoading(nextData),
           errors: undefined,
+        } as TData[K])
+    );
+
+    const updatedState = sig();
+    notifier.notify(key, updatedState, previousState as TData[K]);
+    return true;
+  }
+
+  function applyEnsureKeyedSlot<K extends KeyedStoreKey<TData>>(
+    key: K,
+    resourceKey: KeyedResourceEntryKey<TData, K>
+  ): boolean {
+    const sig = signals.getOrCreate(key);
+    const previousState = sig();
+    const state = previousState as ResourceState<unknown>;
+
+    if (state.data !== undefined && !isKeyedResourceData(state.data)) {
+      return true;
+    }
+
+    const data = isKeyedResourceData(state.data)
+      ? toKeyedResourceRecord(state.data)
+      : toKeyedResourceRecord(createKeyedResourceData());
+
+    if (data[resourceKey] !== undefined) {
+      return true;
+    }
+
+    const nextData: KeyedResourceRecord = {
+      ...data,
+      [resourceKey]: createDefaultState<
+        KeyedResourceEntryValue<TData, K>
+      >() as ResourceState<unknown>,
+    };
+
+    sig.update(
+      (previous) =>
+        ({
+          ...previous,
+          data: nextData as unknown,
+          isLoading: hasAnyKeyLoading(nextData),
         } as TData[K])
     );
 
@@ -286,6 +329,8 @@ export function createStoreMessageConsumer<TData extends StoreDataShape<TData>>(
         return applyClearKeyedOne(message.key, message.resourceKey);
       case "startKeyedLoading":
         return applyStartKeyedLoading(message.key, message.resourceKey);
+      case "ensureKeyedSlot":
+        return applyEnsureKeyedSlot(message.key, message.resourceKey);
     }
   }
 
@@ -381,34 +426,58 @@ export function createStopLoadingMessage<
 
 export function createUpdateKeyedOneMessage<
   TData extends StoreDataShape<TData>,
-  K extends StoreKey<TData>
->(key: K, resourceKey: KeyedResourceKey, entity: unknown): StoreMessage<TData> {
+  K extends KeyedStoreKey<TData>
+>(
+  key: K,
+  resourceKey: KeyedResourceEntryKey<TData, K>,
+  entity: KeyedResourceEntryValue<TData, K>
+): StoreMessage<TData, K> {
   return {
     type: "updateKeyedOne",
     key,
     resourceKey,
     entity,
-  } as unknown as StoreMessage<TData>;
+  } as StoreMessage<TData, K>;
 }
 
 export function createClearKeyedOneMessage<
   TData extends StoreDataShape<TData>,
-  K extends StoreKey<TData>
->(key: K, resourceKey: KeyedResourceKey): StoreMessage<TData> {
+  K extends KeyedStoreKey<TData>
+>(
+  key: K,
+  resourceKey: KeyedResourceEntryKey<TData, K>
+): StoreMessage<TData, K> {
   return {
     type: "clearKeyedOne",
     key,
     resourceKey,
-  } as unknown as StoreMessage<TData>;
+  } as StoreMessage<TData, K>;
 }
 
 export function createStartKeyedLoadingMessage<
   TData extends StoreDataShape<TData>,
-  K extends StoreKey<TData>
->(key: K, resourceKey: KeyedResourceKey): StoreMessage<TData> {
+  K extends KeyedStoreKey<TData>
+>(
+  key: K,
+  resourceKey: KeyedResourceEntryKey<TData, K>
+): StoreMessage<TData, K> {
   return {
     type: "startKeyedLoading",
     key,
     resourceKey,
-  } as unknown as StoreMessage<TData>;
+  } as StoreMessage<TData, K>;
+}
+
+export function createEnsureKeyedSlotMessage<
+  TData extends StoreDataShape<TData>,
+  K extends KeyedStoreKey<TData>
+>(
+  key: K,
+  resourceKey: KeyedResourceEntryKey<TData, K>
+): StoreMessage<TData, K> {
+  return {
+    type: "ensureKeyedSlot",
+    key,
+    resourceKey,
+  } as StoreMessage<TData, K>;
 }

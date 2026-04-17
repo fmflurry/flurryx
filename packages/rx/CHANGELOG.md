@@ -1,5 +1,28 @@
 # @flurryx/rx
 
+## 1.3.2
+
+### Patch Changes
+
+- Publish pure `.for()` keyed read behavior, explicit keyed loading initialization, and aligned package dependency versions.
+- Updated dependencies
+  - @flurryx/core@1.3.2
+  - @flurryx/store@1.3.2
+
+## 1.3.0
+
+### Minor Changes
+
+- 9907541: Minor release with rename of time-travel APIs and new restoreResource method.
+
+### Patch Changes
+
+- f8e1a75: Fix published internal dependency versions so `1.1.x` packages resolve updated store and rx releases correctly.
+- Updated dependencies [f8e1a75]
+- Updated dependencies [9907541]
+  - @flurryx/store@1.3.0
+  - @flurryx/core@1.2.0
+
 ## 1.0.1
 
 ### Patch Changes

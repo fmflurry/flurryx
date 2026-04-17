@@ -1,5 +1,17 @@
 # @flurryx/core
 
+## 1.3.2
+
+### Patch Changes
+
+- Publish pure `.for()` keyed read behavior, explicit keyed loading initialization, and aligned package dependency versions.
+
+## 1.2.0
+
+### Minor Changes
+
+- 9907541: Minor release with rename of time-travel APIs and new restoreResource method.
+
 ## 1.0.1
 
 ### Patch Changes

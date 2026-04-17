@@ -14,19 +14,7 @@
     "experimentalDecorators": true,
     "importHelpers": true,
     "target": "ES2022",
-    "module": "preserve",
-    "paths": {
-      "@angular/common": ["./node_modules/@angular/common"],
-      "@angular/common/*": ["./node_modules/@angular/common/*"],
-      "@angular/core": ["./node_modules/@angular/core"],
-      "@angular/core/*": ["./node_modules/@angular/core/*"],
-      "flurryx": ["../../packages/flurryx/src/index.ts"],
-      "flurryx/http": ["../../packages/flurryx/src/http.ts"],
-      "@flurryx/core": ["../../packages/core/src/index.ts"],
-      "@flurryx/store": ["../../packages/store/src/index.ts"],
-      "@flurryx/rx": ["../../packages/rx/src/index.ts"],
-      "@flurryx/rx/http": ["../../packages/rx/src/http.ts"]
-    }
+    "module": "preserve"
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

@@ -754,14 +754,14 @@ For data indexed by ID (user profiles, invoices, config entries), use `KeyedReso
 
 ```typescript
 interface KeyedResourceData<TKey extends string | number, TValue> {
-  entities: Partial<Record<TKey, TValue>>;
-  isLoading: Partial<Record<TKey, boolean>>;
-  status: Partial<Record<TKey, ResourceStatus>>;
-  errors: Partial<Record<TKey, ResourceErrors>>;
+  [key: string]: ResourceState<TValue> | undefined;
+  [key: number]: ResourceState<TValue> | undefined;
 }
 ```
 
 Each resource key gets **independent** loading, status, and error tracking. The top-level `ResourceState.isLoading` reflects whether _any_ key is loading.
+
+On first keyed fetch, `syncToKeyedStore(..., id)` now bootstraps keyed slot immediately on subscribe. That means `data?.[id]?.isLoading` becomes `true` before first response arrives, without manually seeding `createKeyedResourceData()`.
 
 **Full example:**
 
@@ -793,18 +793,18 @@ export class InvoiceFacade {
 
 // Component
 const data = this.facade.items().data; // KeyedResourceData
-const invoice = data?.entities["inv-123"]; // Invoice | undefined
-const loading = data?.isLoading["inv-123"]; // boolean | undefined
-const errors = data?.errors["inv-123"]; // ResourceErrors | undefined
+const invoice = data?.["inv-123"]?.data; // Invoice | undefined
+const loading = data?.["inv-123"]?.isLoading; // boolean | undefined
+const errors = data?.["inv-123"]?.errors; // ResourceErrors | undefined
 ```
 
 **Utilities:**
 
 ```typescript
 import {
-  createKeyedResourceData, // factory — returns empty { entities: {}, isLoading: {}, ... }
+  createKeyedResourceData, // factory — returns empty keyed object {}
   isKeyedResourceData, // type guard
-  isAnyKeyLoading, // (loading: Record) => boolean
+  isAnyKeyLoading, // (data: KeyedResourceData) => boolean
 } from "flurryx";
 ```
 
@@ -856,7 +856,7 @@ const store = inject(InvoiceStore);
 store.clearKeyedOne("ITEMS", "inv-42");
 ```
 
-`clearKeyedOne` removes the entity, its loading flag, status, and errors for that single key, then recalculates the top-level `isLoading` based on the remaining keys.
+`clearKeyedOne` removes that single keyed `ResourceState` entry, then recalculates the top-level `isLoading` based on the remaining keys.
 
 **Facade example — delete an invoice and evict it from cache:**
 
@@ -1602,10 +1602,8 @@ export class SessionStore {
 
   // After loading customers "c1" and "c2", the cache contains:
   // {
-  //   entities: { c1: Customer, c2: Customer },
-  //   isLoading: { c1: false, c2: false },
-  //   status: { c1: 'Success', c2: 'Success' },
-  //   errors: {}
+  //   c1: { data: Customer, isLoading: false, status: 'Success' },
+  //   c2: { data: Customer, isLoading: false, status: 'Success' }
   // }
 }
 ```

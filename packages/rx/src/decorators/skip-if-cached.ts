@@ -5,7 +5,12 @@ import {
   CACHE_NO_TIMEOUT,
   DEFAULT_CACHE_TTL_MS,
 } from "@flurryx/core";
-import type { ResourceState, StoreEnum, KeyedResourceKey } from "@flurryx/core";
+import type {
+  KeyedResourceData,
+  ResourceState,
+  StoreEnum,
+  KeyedResourceKey,
+} from "@flurryx/core";
 
 type StoreWithSignal<TKey extends StoreEnum> = {
   get: (key: TKey) => Signal<ResourceState<unknown>> | undefined;
@@ -120,12 +125,20 @@ function getStoreContext<TTarget, TKey extends StoreEnum>(
 interface CacheContext {
   isKeyedCall: boolean;
   resourceKey: KeyedResourceKey | undefined;
-  keyedData: ReturnType<typeof isKeyedResourceData> extends true
-    ? { entities: object; isLoading: object; status: object; errors: object }
-    : undefined;
+  keyedData: KeyedResourceData<KeyedResourceKey, unknown> | undefined;
   runtimeCacheKey: string;
   keyedCacheEntry: CacheEntry | undefined;
   nonKeyedCacheEntry: CacheEntry | undefined;
+}
+
+type KeyedResourceRecord = Partial<
+  Record<KeyedResourceKey, ResourceState<unknown>>
+>;
+
+function toKeyedResourceRecord(
+  data: KeyedResourceData<KeyedResourceKey, unknown>
+): KeyedResourceRecord {
+  return data as unknown as KeyedResourceRecord;
 }
 
 function getCacheContext(
@@ -151,7 +164,7 @@ function getCacheContext(
   return {
     isKeyedCall,
     resourceKey,
-    keyedData: keyedData as CacheContext["keyedData"],
+    keyedData,
     runtimeCacheKey,
     keyedCacheEntry,
     nonKeyedCacheEntry,
@@ -168,11 +181,8 @@ function handleCacheErrors(
     clearCacheEntry(store, storeKey, "__single__");
   }
   if (context.keyedData && context.resourceKey !== undefined) {
-    const status = (
-      context.keyedData as {
-        status: Partial<Record<KeyedResourceKey, string>>;
-      }
-    ).status[context.resourceKey];
+    const keyedData = toKeyedResourceRecord(context.keyedData);
+    const status = keyedData[context.resourceKey]?.status;
     if (status === "Error") {
       clearCacheEntry(store, storeKey, context.runtimeCacheKey);
     }
@@ -198,15 +208,10 @@ function handleKeyedCache(
     return { hit: false };
   }
 
-  const typed = keyedData as {
-    status: Partial<Record<KeyedResourceKey, string>>;
-    entities: Partial<Record<KeyedResourceKey, unknown>>;
-    isLoading: Partial<Record<KeyedResourceKey, boolean>>;
-  };
-
-  const status = typed.status[resourceKey];
-  const entity = typed.entities[resourceKey];
-  const loading = typed.isLoading[resourceKey] === true;
+  const resourceState = toKeyedResourceRecord(keyedData)[resourceKey];
+  const status = resourceState?.status;
+  const entity = resourceState?.data;
+  const loading = resourceState?.isLoading === true;
 
   const expired = isExpired(keyedCacheEntry?.timestamp, timeoutMs, now);
   if (expired) {

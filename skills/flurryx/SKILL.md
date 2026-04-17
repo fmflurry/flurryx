@@ -254,7 +254,7 @@ loadInvoice(id: string) {
 ```
 
 - When the first method argument is a `string` or `number`, decorators auto-detect it as the keyed resource id
-- Read keyed values from `state().data?.entities[id]`, `isLoading[id]`, `status[id]`, and `errors[id]`
+- Read keyed values from `state().data?.[id]?.data`, `?.isLoading`, `?.status`, and `?.errors`
 
 ### Mirroring and Aggregation
 

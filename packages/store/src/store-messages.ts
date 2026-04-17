@@ -93,6 +93,18 @@ export type StartKeyedLoadingStoreMessage<
     readonly key: K;
     readonly resourceKey: KeyedResourceEntryKey<TData, K>;
   };
+  }[KeyedStoreKey<TData, TKey>];
+
+/** Legacy/internal message for explicit keyed-slot initialization compatibility. */
+export type EnsureKeyedSlotStoreMessage<
+  TData extends StoreDataShape<TData>,
+  TKey extends StoreKey<TData> = StoreKey<TData>
+> = {
+  readonly [K in KeyedStoreKey<TData, TKey>]: {
+    readonly type: "ensureKeyedSlot";
+    readonly key: K;
+    readonly resourceKey: KeyedResourceEntryKey<TData, K>;
+  };
 }[KeyedStoreKey<TData, TKey>];
 
 /** Discriminated union of all typed store messages published to the broker channel. */
@@ -107,7 +119,8 @@ export type StoreMessage<
   | StopLoadingStoreMessage<TData, TKey>
   | UpdateKeyedOneStoreMessage<TData, TKey>
   | ClearKeyedOneStoreMessage<TData, TKey>
-  | StartKeyedLoadingStoreMessage<TData, TKey>;
+  | StartKeyedLoadingStoreMessage<TData, TKey>
+  | EnsureKeyedSlotStoreMessage<TData, TKey>;
 
 /** Full store state captured at a point in time, keyed by slot name. Used by history and time travel. */
 export type StoreSnapshot<

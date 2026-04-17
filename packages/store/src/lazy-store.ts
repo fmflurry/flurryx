@@ -1,12 +1,17 @@
 import { signal, type Signal, WritableSignal } from "@angular/core";
-import { type ResourceState, type KeyedResourceKey } from "@flurryx/core";
+import { type ResourceState } from "@flurryx/core";
 import type {
   IStore,
+  KeyedResourceEntryKey,
+  KeyedResourceEntryValue,
+  KeyedStoreKey,
   StoreDataShape,
   StoreKey,
   StoreOptions,
+  StoreSignal,
   StoreUpdateOptions,
 } from "./types";
+import { createStoreSignalView } from "./store-signal";
 import { cloneValue } from "./store-clone";
 import {
   createStoreHistory,
@@ -45,6 +50,7 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     string,
     WritableSignal<ResourceState<unknown>>
   >();
+  private readonly signalViews = new Map<string, Signal<unknown>>();
   private readonly hooks = new Map<string, UpdateCallback[]>();
   private readonly historyDriver: StoreHistoryDriver<TData>;
 
@@ -187,8 +193,19 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   }
 
   /** @inheritDoc */
-  get<K extends StoreKey<TData>>(key: K): Signal<TData[K]> {
-    return this.getOrCreate(key);
+  get<K extends StoreKey<TData>>(key: K): StoreSignal<TData, K> {
+    const keyString = key.toString();
+    const cachedView = this.signalViews.get(keyString);
+    if (cachedView) {
+      return cachedView as StoreSignal<TData, K>;
+    }
+
+    const signalView = createStoreSignalView<TData, K>(
+      this.getOrCreate(key)
+    );
+
+    this.signalViews.set(keyString, signalView as Signal<unknown>);
+    return signalView;
   }
 
   /** @inheritDoc */
@@ -223,10 +240,10 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   }
 
   /** @inheritDoc */
-  updateKeyedOne<K extends StoreKey<TData>>(
+  updateKeyedOne<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey,
-    entity: unknown
+    resourceKey: KeyedResourceEntryKey<TData, K>,
+    entity: KeyedResourceEntryValue<TData, K>
   ): void {
     this.historyDriver.publish(
       createUpdateKeyedOneMessage<TData, K>(
@@ -238,9 +255,9 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   }
 
   /** @inheritDoc */
-  clearKeyedOne<K extends StoreKey<TData>>(
+  clearKeyedOne<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey
+    resourceKey: KeyedResourceEntryKey<TData, K>
   ): void {
     this.historyDriver.publish(
       createClearKeyedOneMessage<TData, K>(key, resourceKey)
@@ -248,9 +265,9 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   }
 
   /** @inheritDoc */
-  startKeyedLoading<K extends StoreKey<TData>>(
+  startKeyedLoading<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey
+    resourceKey: KeyedResourceEntryKey<TData, K>
   ): void {
     this.historyDriver.publish(
       createStartKeyedLoadingMessage<TData, K>(key, resourceKey)
@@ -315,4 +332,5 @@ export class LazyStore<TData extends StoreDataShape<TData>>
       });
     }
   }
+
 }

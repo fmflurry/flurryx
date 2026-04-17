@@ -6,6 +6,7 @@ vi.mock("@angular/core", async () => {
 
 import { BaseStore, createInMemoryStoreMessageChannel } from "../index";
 import type { ResourceState, KeyedResourceData } from "@flurryx/core";
+import { computed, signal } from "@angular/core";
 
 enum TestStoreEnum {
   ITEM_ONE = "ITEM_ONE",
@@ -16,7 +17,9 @@ enum TestStoreEnum {
 interface TestData {
   [TestStoreEnum.ITEM_ONE]: ResourceState<string>;
   [TestStoreEnum.ITEM_TWO]: ResourceState<number>;
-  [TestStoreEnum.ITEM_THREE]: ResourceState<{ id: string; name: string }>;
+  [TestStoreEnum.ITEM_THREE]: ResourceState<
+    KeyedResourceData<string, { id: string; name: string }>
+  >;
 }
 
 class TestStore extends BaseStore<typeof TestStoreEnum, TestData> {
@@ -420,9 +423,9 @@ describe("BaseStore", () => {
         string,
         { id: string; name: string }
       >;
-      expect(data.entities["1"]).toEqual({ id: "1", name: "Item 1" });
-      expect(data.isLoading["1"]).toBe(false);
-      expect(data.status["1"]).toBe("Success");
+      expect(data["1"]?.data).toEqual({ id: "1", name: "Item 1" });
+      expect(data["1"]?.isLoading).toBe(false);
+      expect(data["1"]?.status).toBe("Success");
     });
 
     it("clearKeyedOne should remove a single keyed entity", () => {
@@ -442,8 +445,8 @@ describe("BaseStore", () => {
         string,
         { id: string; name: string }
       >;
-      expect(data.entities["1"]).toBeUndefined();
-      expect(data.entities["2"]).toEqual({ id: "2", name: "Item 2" });
+      expect(data["1"]).toBeUndefined();
+      expect(data["2"]?.data).toEqual({ id: "2", name: "Item 2" });
     });
 
     it("startKeyedLoading should set loading for a specific key", () => {
@@ -459,13 +462,35 @@ describe("BaseStore", () => {
         string,
         { id: string; name: string }
       >;
-      expect(data.isLoading["2"]).toBe(true);
-      expect(data.isLoading["1"]).toBe(false);
+      expect(data["2"]?.isLoading).toBe(true);
+      expect(data["1"]?.isLoading).toBe(false);
+      expect(state.isLoading).toBe(true);
+    });
+
+    it("startKeyedLoading should initialize keyed entry when slot is empty", () => {
+      store.startKeyedLoading(TestStoreEnum.ITEM_THREE, "2");
+
+      const state = store.get(TestStoreEnum.ITEM_THREE)();
+      const data = state.data as unknown as KeyedResourceData<
+        string,
+        { id: string; name: string }
+      >;
+
+      expect(data["2"]).toEqual({
+        data: undefined,
+        isLoading: true,
+        status: undefined,
+        errors: undefined,
+      });
       expect(state.isLoading).toBe(true);
     });
 
     it("startKeyedLoading should fall back to startLoading if no keyed data", () => {
-      store.startKeyedLoading(TestStoreEnum.ITEM_ONE, "key1");
+      (
+        store as unknown as {
+          startKeyedLoading(key: TestStoreEnum.ITEM_ONE, resourceKey: string): void;
+        }
+      ).startKeyedLoading(TestStoreEnum.ITEM_ONE, "key1");
 
       const state = store.get(TestStoreEnum.ITEM_ONE)();
       expect(state.isLoading).toBe(true);
@@ -474,7 +499,11 @@ describe("BaseStore", () => {
     it("clearKeyedOne should do nothing if data is not keyed", () => {
       store.update(TestStoreEnum.ITEM_ONE, { data: "plain" });
       expect(() =>
-        store.clearKeyedOne(TestStoreEnum.ITEM_ONE, "key1")
+        (
+          store as unknown as {
+            clearKeyedOne(key: TestStoreEnum.ITEM_ONE, resourceKey: string): void;
+          }
+        ).clearKeyedOne(TestStoreEnum.ITEM_ONE, "key1")
       ).not.toThrow();
     });
 
@@ -490,6 +519,71 @@ describe("BaseStore", () => {
 
       expect(cb).toHaveBeenCalledTimes(2);
       cleanup();
+    });
+
+    it("get(key).for(rawId) should read default state without materializing slot", () => {
+      const historyLengthBefore = store.history().length;
+      const messageLengthBefore = store.messages().length;
+      const detailSignal = store.get(TestStoreEnum.ITEM_THREE).for("3");
+
+      expect(detailSignal()).toEqual({
+        data: undefined,
+        isLoading: false,
+        status: undefined,
+        errors: undefined,
+      });
+
+      const state = store.get(TestStoreEnum.ITEM_THREE)();
+      expect(state.data).toBeUndefined();
+      expect(state.isLoading).toBe(false);
+      expect(store.history()).toHaveLength(historyLengthBefore);
+      expect(store.messages()).toHaveLength(messageLengthBefore);
+    });
+
+    it("get(key).for(signalId) should not throw inside computed()", () => {
+      const taskId = signal("1");
+      const detailState = computed(() => store.get(TestStoreEnum.ITEM_THREE).for(taskId)());
+
+      expect(() => detailState()).not.toThrow();
+      expect(detailState()).toEqual({
+        data: undefined,
+        isLoading: false,
+        status: undefined,
+        errors: undefined,
+      });
+    });
+
+    it("get(key).for(signalId) should follow current key without materializing missing slots", () => {
+      const taskId = signal("1");
+      const detailSignal = store.get(TestStoreEnum.ITEM_THREE).for(taskId);
+
+      expect(detailSignal().data).toBeUndefined();
+
+      store.updateKeyedOne(TestStoreEnum.ITEM_THREE, "1", {
+        id: "1",
+        name: "Item 1",
+      });
+      expect(detailSignal().data).toEqual({ id: "1", name: "Item 1" });
+
+      taskId.set("2");
+      expect(detailSignal()).toEqual({
+        data: undefined,
+        isLoading: false,
+        status: undefined,
+        errors: undefined,
+      });
+      const missingState = store.get(TestStoreEnum.ITEM_THREE)();
+      const missingData = missingState.data as unknown as KeyedResourceData<
+        string,
+        { id: string; name: string }
+      >;
+      expect(missingData["2"]).toBeUndefined();
+
+      store.updateKeyedOne(TestStoreEnum.ITEM_THREE, "2", {
+        id: "2",
+        name: "Item 2",
+      });
+      expect(detailSignal().data).toEqual({ id: "2", name: "Item 2" });
     });
 
     it("clearKeyedOne should notify update hooks", () => {

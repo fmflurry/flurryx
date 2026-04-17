@@ -44,10 +44,7 @@ describe('collectKeyed', () => {
 
     const state = target.get('CUSTOMER_DETAILS')();
     expect(state.data).toBeDefined();
-    expect(state.data!.entities).toEqual({});
-    expect(state.data!.isLoading).toEqual({});
-    expect(state.data!.status).toEqual({});
-    expect(state.data!.errors).toEqual({});
+    expect(state.data).toEqual({});
   });
 
   it('should accumulate entities on success', () => {
@@ -66,9 +63,9 @@ describe('collectKeyed', () => {
     });
 
     let state = target.get('CUSTOMER_DETAILS')();
-    expect(state.data!.entities['c1']).toEqual({ id: 'c1', name: 'Alice' });
-    expect(state.data!.status['c1']).toBe('Success');
-    expect(state.data!.isLoading['c1']).toBe(false);
+    expect(state.data!['c1']?.data).toEqual({ id: 'c1', name: 'Alice' });
+    expect(state.data!['c1']?.status).toBe('Success');
+    expect(state.data!['c1']?.isLoading).toBe(false);
 
     // Second entity
     source.update('CUSTOMER_DETAILS', {
@@ -78,8 +75,8 @@ describe('collectKeyed', () => {
     });
 
     state = target.get('CUSTOMER_DETAILS')();
-    expect(state.data!.entities['c1']).toEqual({ id: 'c1', name: 'Alice' });
-    expect(state.data!.entities['c2']).toEqual({ id: 'c2', name: 'Bob' });
+    expect(state.data!['c1']?.data).toEqual({ id: 'c1', name: 'Alice' });
+    expect(state.data!['c2']?.data).toEqual({ id: 'c2', name: 'Bob' });
   });
 
   it('should use a different target key when specified', () => {
@@ -100,7 +97,7 @@ describe('collectKeyed', () => {
     });
 
     const state = target.get('CUSTOMER_CACHE')();
-    expect(state.data!.entities['c1']).toEqual({ id: 'c1', name: 'Alice' });
+    expect(state.data!['c1']?.data).toEqual({ id: 'c1', name: 'Alice' });
   });
 
   it('should remove entity when source is cleared', () => {
@@ -117,13 +114,13 @@ describe('collectKeyed', () => {
       status: 'Success',
     });
 
-    expect(target.get('CUSTOMER_DETAILS')().data!.entities['c1']).toBeDefined();
+    expect(target.get('CUSTOMER_DETAILS')().data!['c1']).toBeDefined();
 
     // Clear source
     source.clear('CUSTOMER_DETAILS');
 
     const state = target.get('CUSTOMER_DETAILS')();
-    expect(state.data!.entities['c1']).toBeUndefined();
+    expect(state.data!['c1']).toBeUndefined();
   });
 
   it('should handle error state for an entity', () => {
@@ -148,10 +145,10 @@ describe('collectKeyed', () => {
     });
 
     const state = target.get('CUSTOMER_DETAILS')();
-    expect(state.data!.status['c2']).toBe('Error');
-    expect(state.data!.errors['c2']).toEqual([{ code: '404', message: 'Not found' }]);
+    expect(state.data!['c2']?.status).toBe('Error');
+    expect(state.data!['c2']?.errors).toEqual([{ code: '404', message: 'Not found' }]);
     // Previous entity should still exist
-    expect(state.data!.entities['c1']).toEqual({ id: 'c1', name: 'Alice' });
+    expect(state.data!['c1']?.data).toEqual({ id: 'c1', name: 'Alice' });
   });
 
   it('should stop collecting when cleanup function is called', () => {
@@ -178,8 +175,8 @@ describe('collectKeyed', () => {
     });
 
     const state = target.get('CUSTOMER_DETAILS')();
-    expect(state.data!.entities['c1']).toBeDefined();
-    expect(state.data!.entities['c2']).toBeUndefined();
+    expect(state.data!['c1']).toBeDefined();
+    expect(state.data!['c2']).toBeUndefined();
   });
 
   it('should register cleanup via destroyRef', () => {
@@ -209,8 +206,8 @@ describe('collectKeyed', () => {
       status: 'Success',
     });
 
-    expect(target.get('CUSTOMER_DETAILS')().data!.entities['c1']).toBeDefined();
-    expect(target.get('CUSTOMER_DETAILS')().data!.entities['c2']).toBeUndefined();
+    expect(target.get('CUSTOMER_DETAILS')().data!['c1']).toBeDefined();
+    expect(target.get('CUSTOMER_DETAILS')().data!['c2']).toBeUndefined();
   });
 
   it('should track loading state per entity', () => {
@@ -227,7 +224,7 @@ describe('collectKeyed', () => {
     });
 
     let state = target.get('CUSTOMER_DETAILS')();
-    expect(state.data!.isLoading['c1']).toBe(true);
+    expect(state.data!['c1']?.isLoading).toBe(true);
     expect(state.isLoading).toBe(true);
 
     source.update('CUSTOMER_DETAILS', {
@@ -237,7 +234,7 @@ describe('collectKeyed', () => {
     });
 
     state = target.get('CUSTOMER_DETAILS')();
-    expect(state.data!.isLoading['c1']).toBe(false);
-    expect(state.data!.entities['c1']).toEqual({ id: 'c1', name: 'Alice' });
+    expect(state.data!['c1']?.isLoading).toBe(false);
+    expect(state.data!['c1']?.data).toEqual({ id: 'c1', name: 'Alice' });
   });
 });

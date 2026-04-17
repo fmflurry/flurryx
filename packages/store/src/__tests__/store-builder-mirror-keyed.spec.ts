@@ -77,8 +77,8 @@ describe("Store builder .mirrorKeyed() — unconstrained builder", () => {
     });
 
     const state = sessionStore.get("CUSTOMER_DETAILS")();
-    expect(state.data!.entities["c1"]).toEqual({ id: "c1", name: "Alice" });
-    expect(state.data!.status["c1"]).toBe("Success");
+    expect(state.data!["c1"]?.data).toEqual({ id: "c1", name: "Alice" });
+    expect(state.data!["c1"]?.status).toBe("Success");
   });
 
   it("should mirrorKeyed to a different target key", () => {
@@ -102,7 +102,7 @@ describe("Store builder .mirrorKeyed() — unconstrained builder", () => {
     });
 
     const state = sessionStore.get("CUSTOMER_CACHE")();
-    expect(state.data!.entities["c1"]).toEqual({ id: "c1", name: "Alice" });
+    expect(state.data!["c1"]?.data).toEqual({ id: "c1", name: "Alice" });
   });
 
   it("should accumulate multiple entities", () => {
@@ -129,8 +129,8 @@ describe("Store builder .mirrorKeyed() — unconstrained builder", () => {
     });
 
     const state = sessionStore.get("CUSTOMER_DETAILS")();
-    expect(state.data!.entities["c1"]).toEqual({ id: "c1", name: "Alice" });
-    expect(state.data!.entities["c2"]).toEqual({ id: "c2", name: "Bob" });
+    expect(state.data!["c1"]?.data).toEqual({ id: "c1", name: "Alice" });
+    expect(state.data!["c2"]?.data).toEqual({ id: "c2", name: "Bob" });
   });
 
   it("should support mirror and mirrorKeyed combined", () => {
@@ -165,7 +165,7 @@ describe("Store builder .mirrorKeyed() — unconstrained builder", () => {
     });
 
     expect(
-      sessionStore.get("CUSTOMER_DETAILS")().data!.entities["c1"]
+      sessionStore.get("CUSTOMER_DETAILS")().data!["c1"]?.data
     ).toEqual({ id: "c1", name: "Alice" });
   });
 });
@@ -198,7 +198,7 @@ describe("Store builder .mirrorKeyed() — interface-based builder", () => {
     });
 
     const state = sessionStore.get("CUSTOMER_DETAILS")();
-    expect(state.data!.entities["c1"]).toEqual({ id: "c1", name: "Alice" });
+    expect(state.data!["c1"]?.data).toEqual({ id: "c1", name: "Alice" });
   });
 
   it("should support multiple mirrors and mirrorKeyed combined", () => {
@@ -233,7 +233,7 @@ describe("Store builder .mirrorKeyed() — interface-based builder", () => {
       { id: "o1", total: 50 },
     ]);
     expect(
-      sessionStore.get("CUSTOMER_DETAILS")().data!.entities["c1"]
+      sessionStore.get("CUSTOMER_DETAILS")().data!["c1"]?.data
     ).toEqual({ id: "c1", name: "Alice" });
   });
 
@@ -254,13 +254,13 @@ describe("Store builder .mirrorKeyed() — interface-based builder", () => {
     });
 
     expect(
-      sessionStore.get("CUSTOMER_DETAILS")().data!.entities["c1"]
+      sessionStore.get("CUSTOMER_DETAILS")().data!["c1"]
     ).toBeDefined();
 
     customerStore.clear("CUSTOMER_DETAILS");
 
     expect(
-      sessionStore.get("CUSTOMER_DETAILS")().data!.entities["c1"]
+      sessionStore.get("CUSTOMER_DETAILS")().data!["c1"]
     ).toBeUndefined();
   });
 });
@@ -303,7 +303,7 @@ describe("Store builder .mirrorKeyed() — constrained builder", () => {
       { id: "c1", name: "Alice" },
     ]);
     expect(
-      sessionStore.get("CUSTOMER_DETAILS")().data!.entities["c1"]
+      sessionStore.get("CUSTOMER_DETAILS")().data!["c1"]?.data
     ).toEqual({ id: "c1", name: "Alice" });
   });
 });

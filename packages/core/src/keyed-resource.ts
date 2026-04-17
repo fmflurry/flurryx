@@ -18,7 +18,7 @@ export type ResourceErrors = NonNullable<ResourceState<unknown>["errors"]>;
 /**
  * Container for keyed (indexed by ID) resource data.
  *
- * Each entity gets **independent** loading, status, and error tracking.
+ * Each entity key points to its own {@link ResourceState}.
  * Use this when a single store slot manages multiple entities (e.g. user profiles by ID).
  *
  * @template TKey - The entity identifier type (`string` or `number`).
@@ -32,97 +32,100 @@ export type ResourceErrors = NonNullable<ResourceState<unknown>["errors"]>;
  *
  * // Accessing per-key state:
  * const data = store.get('ITEMS')().data;
- * const invoice = data?.entities['inv-123'];
- * const loading = data?.isLoading['inv-123'];
- * const errors  = data?.errors['inv-123'];
+ * const invoice = data?.['inv-123']?.data;
+ * const loading = data?.['inv-123']?.isLoading;
+ * const errors  = data?.['inv-123']?.errors;
  * ```
  */
-export interface KeyedResourceData<TKey extends KeyedResourceKey, TValue> {
-  /** Map of entity ID → entity value. */
-  entities: Partial<Record<TKey, TValue>>;
-  /** Map of entity ID → whether that entity is currently loading. */
-  isLoading: Partial<Record<TKey, boolean>>;
-  /** Map of entity ID → resource status (`'Success'` or `'Error'`). */
-  status: Partial<Record<TKey, ResourceStatus>>;
-  /** Map of entity ID → error array for that entity. */
-  errors: Partial<Record<TKey, ResourceErrors>>;
+export type KeyedResourceData<
+  TKey extends KeyedResourceKey,
+  TValue,
+> = Partial<Record<TKey, ResourceState<TValue>>>;
+
+function isResourceStateValue(value: unknown): value is ResourceState<unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const keys = Object.keys(value);
+  if (keys.length === 0) {
+    return false;
+  }
+
+  return keys.every(
+    (key) =>
+      key === "data" ||
+      key === "isLoading" ||
+      key === "status" ||
+      key === "errors"
+  );
 }
 
 /**
  * Type guard that checks whether a value is a {@link KeyedResourceData} structure.
  *
  * @param value - The value to check.
- * @returns `true` if the value has `entities`, `isLoading`, `status`, and `errors` object fields.
+ * @returns `true` if the value is a keyed object whose entries look like `ResourceState` values.
  *
  * @example
  * ```ts
  * const state = store.get('ITEMS')();
  * if (isKeyedResourceData(state.data)) {
- *   console.log(state.data.entities);
+ *   console.log(state.data['inv-123']?.data);
  * }
  * ```
  */
 export function isKeyedResourceData(
   value: unknown
 ): value is KeyedResourceData<KeyedResourceKey, unknown> {
-  if (typeof value !== "object" || value === null) {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return false;
   }
 
-  const data = value as Partial<KeyedResourceData<KeyedResourceKey, unknown>>;
-  return (
-    typeof data.entities === "object" &&
-    data.entities !== null &&
-    typeof data.isLoading === "object" &&
-    data.isLoading !== null &&
-    typeof data.status === "object" &&
-    data.status !== null &&
-    typeof data.errors === "object" &&
-    data.errors !== null
-  );
+  return Object.values(value).every(isResourceStateValue);
 }
 
 /**
- * Creates an empty {@link KeyedResourceData} with all maps initialized to `{}`.
+ * Creates an empty {@link KeyedResourceData}.
  *
  * @template TKey - The entity identifier type.
  * @template TValue - The entity type.
- * @returns A new `KeyedResourceData` with empty `entities`, `isLoading`, `status`, and `errors`.
+ * @returns A new `KeyedResourceData` with no keyed entries yet.
  *
  * @example
  * ```ts
  * const initial = createKeyedResourceData<string, Invoice>();
- * // { entities: {}, isLoading: {}, status: {}, errors: {} }
+ * // {}
  * ```
  */
 export function createKeyedResourceData<
   TKey extends KeyedResourceKey,
   TValue
 >(): KeyedResourceData<TKey, TValue> {
-  return {
-    entities: {} as Partial<Record<TKey, TValue>>,
-    isLoading: {} as Partial<Record<TKey, boolean>>,
-    status: {} as Partial<Record<TKey, ResourceStatus>>,
-    errors: {} as Partial<Record<TKey, ResourceErrors>>,
-  };
+  return {} as KeyedResourceData<TKey, TValue>;
 }
 
 /**
- * Checks whether any entity in a keyed loading map is currently loading.
+ * Checks whether any entity in keyed resource data is currently loading.
  *
- * @param loading - The `isLoading` map from a {@link KeyedResourceData}.
+ * @param data - The keyed resource data.
  * @returns `true` if at least one key has a value of `true`.
  *
  * @example
  * ```ts
  * const data = store.get('ITEMS')().data;
- * if (data && isAnyKeyLoading(data.isLoading)) {
+ * if (data && isAnyKeyLoading(data)) {
  *   console.log('At least one item is loading');
  * }
  * ```
  */
-export function isAnyKeyLoading<TKey extends KeyedResourceKey>(
-  loading: Partial<Record<TKey, boolean>>
+export function isAnyKeyLoading<
+  TKey extends KeyedResourceKey,
+  TValue
+>(
+  data: KeyedResourceData<TKey, TValue>
 ): boolean {
-  return Object.values(loading).some((value) => value === true);
+  return (Object.values(data) as Array<ResourceState<TValue> | undefined>).some(
+    (entry) => entry?.isLoading === true
+  );
 }

@@ -1,12 +1,17 @@
 import { signal, type Signal, WritableSignal } from "@angular/core";
-import { ResourceState, type KeyedResourceKey } from "@flurryx/core";
+import { ResourceState } from "@flurryx/core";
 import type {
   IStore,
+  KeyedResourceEntryKey,
+  KeyedResourceEntryValue,
+  KeyedStoreKey,
   StoreDataShape,
   StoreKey,
   StoreOptions,
+  StoreSignal,
   StoreUpdateOptions,
 } from "./types";
+import { createStoreSignalView } from "./store-signal";
 import { cloneValue } from "./store-clone";
 import {
   createStoreHistory,
@@ -63,6 +68,7 @@ export abstract class BaseStore<
     string,
     WritableSignal<ResourceState<unknown>>
   >();
+  private readonly signalViews = new Map<string, Signal<unknown>>();
   private readonly storeKeys: readonly StoreKey<TData>[];
   private readonly historyDriver: StoreHistoryDriver<TData>;
 
@@ -204,8 +210,24 @@ export abstract class BaseStore<
    * @param key - The slot name to read.
    * @returns A `Signal` wrapping the slot's current {@link ResourceState}.
    */
-  get<K extends StoreKey<TData>>(key: K): Signal<TData[K]> {
-    return this.signalsState.get(key.toString()) as unknown as Signal<TData[K]>;
+  get<K extends StoreKey<TData>>(key: K): StoreSignal<TData, K> {
+    const keyString = key.toString();
+    const cachedView = this.signalViews.get(keyString);
+    if (cachedView) {
+      return cachedView as StoreSignal<TData, K>;
+    }
+
+    const rawSignal = this.signalsState.get(keyString) as Signal<TData[K]> | undefined;
+    if (!rawSignal) {
+      return undefined as unknown as StoreSignal<TData, K>;
+    }
+
+    const signalView = createStoreSignalView<TData, K>(
+      rawSignal
+    );
+
+    this.signalViews.set(keyString, signalView as Signal<unknown>);
+    return signalView;
   }
 
   /**
@@ -307,10 +329,10 @@ export abstract class BaseStore<
    * @param resourceKey - The entity identifier (e.g. `'inv-123'`).
    * @param entity - The entity value to store.
    */
-  updateKeyedOne<K extends StoreKey<TData>>(
+  updateKeyedOne<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey,
-    entity: unknown
+    resourceKey: KeyedResourceEntryKey<TData, K>,
+    entity: KeyedResourceEntryValue<TData, K>
   ): void {
     this.historyDriver.publish(
       createUpdateKeyedOneMessage<TData, K>(
@@ -329,9 +351,9 @@ export abstract class BaseStore<
    * @param key - The keyed slot name.
    * @param resourceKey - The entity identifier to remove.
    */
-  clearKeyedOne<K extends StoreKey<TData>>(
+  clearKeyedOne<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey
+    resourceKey: KeyedResourceEntryKey<TData, K>
   ): void {
     this.historyDriver.publish(
       createClearKeyedOneMessage<TData, K>(key, resourceKey)
@@ -340,15 +362,15 @@ export abstract class BaseStore<
 
   /**
    * Marks a single entity within a keyed slot as loading.
-   * Clears its status and errors. If the slot data is not yet a {@link KeyedResourceData},
-   * falls back to `startLoading(key)`.
+   * Clears its status and errors. If the keyed slot has not been initialized yet,
+   * this creates the keyed entry as part of the write operation.
    *
    * @param key - The keyed slot name.
    * @param resourceKey - The entity identifier to mark as loading.
    */
-  startKeyedLoading<K extends StoreKey<TData>>(
+  startKeyedLoading<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey
+    resourceKey: KeyedResourceEntryKey<TData, K>
   ): void {
     this.historyDriver.publish(
       createStartKeyedLoadingMessage<TData, K>(key, resourceKey)

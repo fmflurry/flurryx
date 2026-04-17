@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { of, throwError } from "rxjs";
+import { Observable, of, throwError } from "rxjs";
 
 vi.mock("@angular/core", async () => {
   return import("../__mocks__/@angular/core");
@@ -46,9 +46,9 @@ describe("syncToKeyedStore", () => {
       string,
       { id: string; name: string }
     >;
-    expect(data.entities["1"]).toEqual(entity);
-    expect(data.isLoading["1"]).toBe(false);
-    expect(data.status["1"]).toBe("Success");
+    expect(data["1"]?.data).toEqual(entity);
+    expect(data["1"]?.isLoading).toBe(false);
+    expect(data["1"]?.status).toBe("Success");
     expect(state.isLoading).toBe(false);
   });
 
@@ -64,9 +64,9 @@ describe("syncToKeyedStore", () => {
       string,
       { id: string; name: string }
     >;
-    expect(data.status["missing"]).toBe("Error");
-    expect(data.isLoading["missing"]).toBe(false);
-    expect(data.errors["missing"]).toEqual([
+    expect(data["missing"]?.status).toBe("Error");
+    expect(data["missing"]?.isLoading).toBe(false);
+    expect(data["missing"]?.errors).toEqual([
       { code: "404", message: "Not found" },
     ]);
     expect(store.getDeadLetters()).toMatchObject([
@@ -94,7 +94,7 @@ describe("syncToKeyedStore", () => {
       string,
       { id: string; name: string }
     >;
-    expect(data.entities["2"]).toEqual({ id: "2", name: "Mapped" });
+    expect(data["2"]?.data).toEqual({ id: "2", name: "Mapped" });
   });
 
   it("should initialize keyed data if store data is undefined", () => {
@@ -109,7 +109,37 @@ describe("syncToKeyedStore", () => {
       string,
       { id: string; name: string }
     >;
-    expect(data.entities["1"]).toEqual({ id: "1", name: "First" });
+    expect(data["1"]?.data).toEqual({ id: "1", name: "First" });
+  });
+
+  it("should create keyed loading state on subscribe before first emission", () => {
+    store.clear(TestEnum.ITEMS);
+
+    const source = new Observable<{ id: string; name: string }>(() => {
+      return undefined;
+    });
+
+    const subscription = source
+      .pipe(
+        syncToKeyedStore(store, TestEnum.ITEMS, "1", {
+          completeOnFirstEmission: false,
+        })
+      )
+      .subscribe();
+
+    const state = store.get(TestEnum.ITEMS)();
+    const data = state.data as KeyedResourceData<
+      string,
+      { id: string; name: string }
+    >;
+
+    expect(data["1"]?.data).toBeUndefined();
+    expect(data["1"]?.isLoading).toBe(true);
+    expect(data["1"]?.status).toBeUndefined();
+    expect(data["1"]?.errors).toBeUndefined();
+    expect(state.isLoading).toBe(true);
+
+    subscription.unsubscribe();
   });
 
   it("should call callbackAfterComplete on finalize", () => {
@@ -146,7 +176,7 @@ describe("syncToKeyedStore", () => {
       string,
       { id: string; name: string }
     >;
-    expect(data.errors["k1"]).toEqual([
+    expect(data["k1"]?.errors).toEqual([
       { code: "KEYED_ERR", message: "keyed error" },
     ]);
   });

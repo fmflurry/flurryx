@@ -63,6 +63,33 @@ export type KeyedResourceEntryValue<
   ? TValue
   : never;
 
+/** Accepts either a raw value or a reactive signal that yields that value. */
+export type ValueOrSignal<T> = T | Signal<T>;
+
+/** ResourceState returned for a single keyed entry. */
+export type KeyedResourceState<
+  TData extends StoreDataShape<TData>,
+  K extends KeyedStoreKey<TData>
+> = ResourceState<KeyedResourceEntryValue<TData, K>>;
+
+/** Signal for a keyed store slot that also exposes `.for(...)` per-entry access. */
+export type KeyedStoreSignal<
+  TData extends StoreDataShape<TData>,
+  K extends KeyedStoreKey<TData>
+> = Signal<TData[K]> & {
+  for(
+    resourceKey: ValueOrSignal<KeyedResourceEntryKey<TData, K>>
+  ): Signal<KeyedResourceState<TData, K>>;
+};
+
+/** Conditional signal type returned by `store.get(...)`. */
+export type StoreSignal<
+  TData extends StoreDataShape<TData>,
+  K extends StoreKey<TData>
+> = K extends KeyedStoreKey<TData>
+  ? KeyedStoreSignal<TData, K>
+  : Signal<TData[K]>;
+
 /**
  * Phantom-typed marker for a store resource slot.
  * Carries type information at compile time with zero runtime cost.
@@ -127,7 +154,7 @@ export interface StoreUpdateOptions {
  */
 export interface IStore<TData extends StoreDataShape<TData>> {
   /** Returns a read-only `Signal` for the given slot. */
-  get<K extends StoreKey<TData>>(key: K): Signal<TData[K]>;
+  get<K extends StoreKey<TData>>(key: K): StoreSignal<TData, K>;
   /** Merges a partial state into the given slot (immutable spread). */
   update<K extends StoreKey<TData>>(
     key: K,
@@ -199,20 +226,20 @@ export interface IStore<TData extends StoreDataShape<TData>> {
   /** Returns the currently restored snapshot index used by `restoreStoreAt`, `undo`, and `redo`. */
   getCurrentIndex: StoreHistory<TData>["getCurrentIndex"];
   /** Merges a single entity into a keyed slot and sets its status to `'Success'`. */
-  updateKeyedOne<K extends StoreKey<TData>>(
+  updateKeyedOne<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey,
-    entity: unknown
+    resourceKey: KeyedResourceEntryKey<TData, K>,
+    entity: KeyedResourceEntryValue<TData, K>
   ): void;
   /** Removes a single entity (and its loading/status/errors) from a keyed slot. */
-  clearKeyedOne<K extends StoreKey<TData>>(
+  clearKeyedOne<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey
+    resourceKey: KeyedResourceEntryKey<TData, K>
   ): void;
   /** Marks a single entity within a keyed slot as loading. */
-  startKeyedLoading<K extends StoreKey<TData>>(
+  startKeyedLoading<K extends KeyedStoreKey<TData>>(
     key: K,
-    resourceKey: KeyedResourceKey
+    resourceKey: KeyedResourceEntryKey<TData, K>
   ): void;
   /**
    * Registers a callback invoked whenever the given slot changes.

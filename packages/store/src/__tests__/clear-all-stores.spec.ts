@@ -154,7 +154,7 @@ describe("clearAllStores", () => {
       string,
       Customer
     >;
-    expect(keyedData.entities["customer-1"]).toEqual({
+    expect(keyedData["customer-1"]?.data).toEqual({
       id: "customer-1",
       name: "Alice",
     });

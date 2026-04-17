@@ -1,13 +1,10 @@
-import { finalize, Observable, take, tap } from "rxjs";
+import { defer, finalize, Observable, take, tap } from "rxjs";
 import type { BaseStore, IStore } from "@flurryx/store";
 import {
   createKeyedResourceData,
-  isAnyKeyLoading,
   type KeyedResourceData,
   type KeyedResourceKey,
-  type ResourceErrors,
   type ResourceState,
-  type ResourceStatus,
 } from "@flurryx/core";
 import {
   defaultErrorNormalizer,
@@ -51,15 +48,31 @@ export interface SyncToKeyedStoreOptions<R, TValue> extends SyncToStoreOptions {
   errorNormalizer?: ErrorNormalizer;
 }
 
-function withoutKey<TKey extends KeyedResourceKey, TValue>(
-  record: Partial<Record<TKey, TValue>>,
-  key: TKey
-): Partial<Record<TKey, TValue>> {
-  const next: Partial<Record<TKey, TValue>> = {
-    ...record,
-  };
-  delete next[key];
-  return next;
+type KeyedResourceRecord = Partial<
+  Record<KeyedResourceKey, ResourceState<unknown>>
+>;
+
+function toKeyedResourceRecord(
+  data: KeyedResourceData<KeyedResourceKey, unknown>
+): KeyedResourceRecord {
+  return data as unknown as KeyedResourceRecord;
+}
+
+function hasAnyKeyLoading(data: KeyedResourceRecord): boolean {
+  return Object.values(data).some((entry) => entry?.isLoading === true);
+}
+
+function getKeyedData(
+  syncStore: SyncToKeyedStoreRuntimeStore,
+  storeKey: PropertyKey
+): KeyedResourceRecord {
+  const storeSignal = syncStore.get(storeKey);
+  const state = storeSignal();
+
+  return toKeyedResourceRecord(
+    (state.data as KeyedResourceData<KeyedResourceKey, unknown> | undefined) ??
+      createKeyedResourceData<KeyedResourceKey, unknown>()
+  );
 }
 
 /**
@@ -156,102 +169,99 @@ export function syncToKeyedStore(
   const normalizeError = options.errorNormalizer ?? defaultErrorNormalizer;
   const syncStore = store as SyncToKeyedStoreRuntimeStore;
 
-  return (source: Observable<unknown>) => {
-    let pipeline = source.pipe(
-      tap({
-        next: (response: unknown) => {
-          const value = mapResponse ? mapResponse(response) : response;
-
-          const storeSignal = syncStore.get(storeKey);
-          const state = storeSignal();
-          const data =
-            (state.data as
-              | KeyedResourceData<KeyedResourceKey, unknown>
-              | undefined) ??
-            createKeyedResourceData<KeyedResourceKey, unknown>();
-
-          const nextIsLoading = {
-            ...data.isLoading,
-            [resourceKey]: false,
-          } as Partial<Record<KeyedResourceKey, boolean>>;
-
-          const nextStatus: Partial<Record<KeyedResourceKey, ResourceStatus>> =
-            {
-              ...data.status,
-              [resourceKey]: "Success" as ResourceStatus,
-            };
-
-          const nextData: KeyedResourceData<KeyedResourceKey, unknown> = {
-            ...data,
-            entities: {
-              ...data.entities,
-              [resourceKey]: value,
-            } as Partial<Record<KeyedResourceKey, unknown>>,
-            isLoading: nextIsLoading,
-            status: nextStatus,
-            errors: withoutKey(data.errors, resourceKey),
-          };
-
-          syncStore.update(storeKey, {
-            data: nextData,
-            isLoading: isAnyKeyLoading(nextIsLoading),
-            status: undefined,
-            errors: undefined,
-          });
+  return (source: Observable<unknown>) =>
+    defer(() => {
+      const currentData = getKeyedData(syncStore, storeKey);
+      const keyedLoadingData: KeyedResourceRecord = {
+        ...currentData,
+        [resourceKey]: {
+          ...currentData[resourceKey],
+          isLoading: true,
+          status: undefined,
+          errors: undefined,
         },
-        error: (error: unknown) => {
-          const storeSignal = syncStore.get(storeKey);
-          const state = storeSignal();
-          const data =
-            (state.data as
-              | KeyedResourceData<KeyedResourceKey, unknown>
-              | undefined) ??
-            createKeyedResourceData<KeyedResourceKey, unknown>();
+      };
 
-          const nextIsLoading = {
-            ...data.isLoading,
-            [resourceKey]: false,
-          } as Partial<Record<KeyedResourceKey, boolean>>;
+      syncStore.update(storeKey, {
+        data: keyedLoadingData as unknown as KeyedResourceData<
+          KeyedResourceKey,
+          unknown
+        >,
+        isLoading: true,
+        status: undefined,
+        errors: undefined,
+      });
 
-          const nextStatus: Partial<Record<KeyedResourceKey, ResourceStatus>> =
-            {
-              ...data.status,
-              [resourceKey]: "Error" as ResourceStatus,
+      let pipeline = source.pipe(
+        tap({
+          next: (response: unknown) => {
+            const value = mapResponse ? mapResponse(response) : response;
+
+            const data = getKeyedData(syncStore, storeKey);
+
+            const nextData: KeyedResourceRecord = {
+              ...data,
+              [resourceKey]: {
+                data: value,
+                isLoading: false,
+                status: "Success" as const,
+                errors: undefined,
+              },
             };
 
-          const nextErrors: Partial<Record<KeyedResourceKey, ResourceErrors>> =
-            {
-              ...data.errors,
-              [resourceKey]: normalizeError(error),
+            syncStore.update(storeKey, {
+              data: nextData as unknown as KeyedResourceData<
+                KeyedResourceKey,
+                unknown
+              >,
+              isLoading: hasAnyKeyLoading(nextData),
+              status: undefined,
+              errors: undefined,
+            });
+          },
+          error: (error: unknown) => {
+            const data = getKeyedData(syncStore, storeKey);
+
+            const nextData: KeyedResourceRecord = {
+              ...data,
+              [resourceKey]: {
+                ...data[resourceKey],
+                isLoading: false,
+                status: "Error" as const,
+                errors: normalizeError(error),
+              },
             };
 
-          const nextData: KeyedResourceData<KeyedResourceKey, unknown> = {
-            ...data,
-            isLoading: nextIsLoading,
-            status: nextStatus,
-            errors: nextErrors,
-          };
+            syncStore.update(
+              storeKey,
+              {
+                data: nextData as unknown as KeyedResourceData<
+                  KeyedResourceKey,
+                  unknown
+                >,
+                isLoading: hasAnyKeyLoading(nextData),
+                status: undefined,
+                errors: undefined,
+              },
+              {
+                deadLetter: createDeadLetterMeta(
+                  error,
+                  options.deadLetterCommand
+                ),
+              }
+            );
+          },
+        })
+      );
 
-          syncStore.update(storeKey, {
-            data: nextData,
-            isLoading: isAnyKeyLoading(nextIsLoading),
-            status: undefined,
-            errors: undefined,
-          }, {
-            deadLetter: createDeadLetterMeta(error, options.deadLetterCommand),
-          });
-        },
-      })
-    );
+      if (completeOnFirstEmission) {
+        pipeline = pipeline.pipe(take(1));
+      }
 
-    if (completeOnFirstEmission) {
-      pipeline = pipeline.pipe(take(1));
-    }
+      if (callbackAfterComplete) {
+        pipeline = pipeline.pipe(finalize(callbackAfterComplete));
+      }
 
-    if (callbackAfterComplete) {
-      pipeline = pipeline.pipe(finalize(callbackAfterComplete));
-    }
-
-    return pipeline;
-  };
+      return pipeline;
+    });
 }

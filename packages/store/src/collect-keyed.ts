@@ -3,8 +3,22 @@ import type {
   KeyedResourceKey,
   KeyedResourceData,
 } from "@flurryx/core";
-import { createKeyedResourceData, isAnyKeyLoading } from "@flurryx/core";
+import { createKeyedResourceData } from "@flurryx/core";
 import type { IStore, StoreDataShape, StoreKey } from "./types";
+
+type KeyedResourceRecord<TEntity> = Partial<
+  Record<KeyedResourceKey, ResourceState<TEntity>>
+>;
+
+function toKeyedResourceRecord<TEntity>(
+  data: KeyedResourceData<KeyedResourceKey, TEntity>
+): KeyedResourceRecord<TEntity> {
+  return data as unknown as KeyedResourceRecord<TEntity>;
+}
+
+function hasAnyKeyLoading<TEntity>(data: KeyedResourceRecord<TEntity>): boolean {
+  return Object.values(data).some((entry) => entry?.isLoading === true);
+}
 
 /**
  * Options for {@link collectKeyed}.
@@ -78,93 +92,68 @@ export function collectKeyed<
       return;
     }
 
-    if (resourceState.status === "Success" && currentId !== undefined) {
-      const newEntities = {
-        ...currentKeyed.entities,
-        [currentId]: resourceState.data,
-      };
-      const newIsLoading = { ...currentKeyed.isLoading, [currentId]: false };
-      const newStatus = {
-        ...currentKeyed.status,
-        [currentId]: resourceState.status,
-      };
-      const newErrors = { ...currentKeyed.errors };
-      delete newErrors[currentId];
+    const keyedRecord = toKeyedResourceRecord(currentKeyed);
 
-      const updatedKeyed: KeyedResourceData<KeyedResourceKey, TEntity> = {
-        entities: newEntities,
-        isLoading: newIsLoading,
-        status: newStatus,
-        errors: newErrors,
+    if (resourceState.status === "Success" && currentId !== undefined) {
+      const updatedKeyed: KeyedResourceRecord<TEntity> = {
+        ...keyedRecord,
+        [currentId]: {
+          data: resourceState.data,
+          isLoading: false,
+          status: resourceState.status,
+          errors: undefined,
+        },
       };
 
       target.update(resolvedTargetKey, {
-        data: updatedKeyed,
-        isLoading: isAnyKeyLoading(newIsLoading),
+        data: updatedKeyed as unknown as KeyedResourceData<KeyedResourceKey, TEntity>,
+        isLoading: hasAnyKeyLoading(updatedKeyed),
         status: "Success",
       } as Partial<TTarget[StoreKey<TTarget>]>);
 
       previousId = currentId;
     } else if (resourceState.status === "Error" && currentId !== undefined) {
-      const newIsLoading = { ...currentKeyed.isLoading, [currentId]: false };
-      const newStatus = {
-        ...currentKeyed.status,
-        [currentId]: resourceState.status,
-      };
-      const newErrors = {
-        ...currentKeyed.errors,
-        [currentId]: resourceState.errors,
-      };
-
-      const updatedKeyed: KeyedResourceData<KeyedResourceKey, TEntity> = {
-        entities: { ...currentKeyed.entities },
-        isLoading: newIsLoading,
-        status: newStatus,
-        errors: newErrors,
+      const updatedKeyed: KeyedResourceRecord<TEntity> = {
+        ...keyedRecord,
+        [currentId]: {
+          ...keyedRecord[currentId],
+          isLoading: false,
+          status: resourceState.status,
+          errors: resourceState.errors,
+        },
       };
 
       target.update(resolvedTargetKey, {
-        data: updatedKeyed,
-        isLoading: isAnyKeyLoading(newIsLoading),
+        data: updatedKeyed as unknown as KeyedResourceData<KeyedResourceKey, TEntity>,
+        isLoading: hasAnyKeyLoading(updatedKeyed),
       } as Partial<TTarget[StoreKey<TTarget>]>);
 
       previousId = currentId;
     } else if (resourceState.data === undefined && previousId !== undefined) {
       // Source cleared — remove previous entity from cache
-      const { [previousId]: _removed, ...remainingEntities } =
-        currentKeyed.entities;
-      const { [previousId]: _removedLoading, ...remainingLoading } =
-        currentKeyed.isLoading;
-      const { [previousId]: _removedStatus, ...remainingStatus } =
-        currentKeyed.status;
-      const { [previousId]: _removedErrors, ...remainingErrors } =
-        currentKeyed.errors;
-
-      const updatedKeyed: KeyedResourceData<KeyedResourceKey, TEntity> = {
-        entities: remainingEntities,
-        isLoading: remainingLoading,
-        status: remainingStatus,
-        errors: remainingErrors,
-      };
+      const updatedKeyed = { ...keyedRecord };
+      delete updatedKeyed[previousId];
 
       target.update(resolvedTargetKey, {
-        data: updatedKeyed,
-        isLoading: isAnyKeyLoading(remainingLoading),
+        data: updatedKeyed as unknown as KeyedResourceData<KeyedResourceKey, TEntity>,
+        isLoading: hasAnyKeyLoading(updatedKeyed),
       } as Partial<TTarget[StoreKey<TTarget>]>);
 
       previousId = undefined;
     } else if (resourceState.isLoading && currentId !== undefined) {
-      const newIsLoading = { ...currentKeyed.isLoading, [currentId]: true };
-
-      const updatedKeyed: KeyedResourceData<KeyedResourceKey, TEntity> = {
-        entities: { ...currentKeyed.entities },
-        isLoading: newIsLoading,
-        status: { ...currentKeyed.status },
-        errors: { ...currentKeyed.errors },
+      const updatedKeyed: KeyedResourceRecord<TEntity> = {
+        ...keyedRecord,
+        [currentId]: {
+          ...keyedRecord[currentId],
+          data: resourceState.data,
+          isLoading: true,
+          status: undefined,
+          errors: undefined,
+        },
       };
 
       target.update(resolvedTargetKey, {
-        data: updatedKeyed,
+        data: updatedKeyed as unknown as KeyedResourceData<KeyedResourceKey, TEntity>,
         isLoading: true,
       } as Partial<TTarget[StoreKey<TTarget>]>);
 

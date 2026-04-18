@@ -35,8 +35,9 @@ export {
 export type {
   MirrorOptions,
   DeriveOptions,
-  CollectKeyedOptions,
-  StoreOptions,
+   CollectKeyedOptions,
+   StoreCacheInvalidateEvent,
+   StoreOptions,
   StoreDeadLetterEntry,
   StoreHistory,
   StoreHistoryEntry,

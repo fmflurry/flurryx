@@ -11,6 +11,7 @@ export type { CollectKeyedOptions } from "./collect-keyed";
 export type {
   IStore,
   ConfigToData,
+  StoreCacheInvalidateEvent,
   StoreOptions,
   StoreUpdateOptions,
   KeyedResourceState,

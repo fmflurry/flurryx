@@ -152,4 +152,20 @@ describe('mirrorKey', () => {
     expect(state.status).toBe('Error');
     expect(state.errors).toEqual([{ code: '500', message: 'Server error' }]);
   });
+
+  it('should propagate cache invalidation to target listeners', () => {
+    const source = createSource();
+    const target = createTarget();
+    const listener = vi.fn();
+
+    mirrorKey(source, 'CUSTOMERS', target);
+    target.onCacheInvalidate('CUSTOMERS', listener);
+
+    source.invalidateCacheFor('CUSTOMERS');
+
+    expect(listener).toHaveBeenCalledWith({
+      key: 'CUSTOMERS',
+      resourceKey: undefined,
+    });
+  });
 });

@@ -6,15 +6,18 @@ vi.mock('@angular/core', async () => {
 });
 
 import { BaseStore } from '@flurryx/store';
-import type { ResourceState } from '@flurryx/core';
+import { collectKeyed, LazyStore } from '@flurryx/store';
+import type { KeyedResourceData, ResourceState } from '@flurryx/core';
 import { SkipIfCached } from '../decorators/skip-if-cached';
 
 enum TestEnum {
   DATA = 'DATA',
+  KEYED = 'KEYED',
 }
 
 interface TestData {
   [TestEnum.DATA]: ResourceState<string>;
+  [TestEnum.KEYED]: ResourceState<KeyedResourceData<string, { id: string; value: string }>>;
 }
 
 class TestStore extends BaseStore<typeof TestEnum, TestData> {
@@ -226,5 +229,107 @@ describe('SkipIfCached', () => {
     // Different args - should re-execute
     facade.loadData('b');
     expect(methodFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('should skip keyed mirrored execution when source success seeded cache', () => {
+    interface DetailEntity {
+      id: string;
+      value: string;
+    }
+
+    type SourceData = {
+      DETAIL: ResourceState<DetailEntity>;
+    };
+
+    type TargetData = {
+      DETAIL: ResourceState<KeyedResourceData<string, DetailEntity>>;
+    };
+
+    const source = new LazyStore<SourceData>();
+    const target = new LazyStore<TargetData>();
+    const methodFn = vi.fn();
+
+    collectKeyed<SourceData, TargetData, DetailEntity>(source, 'DETAIL', target, {
+      extractId: (data) => data?.id,
+    });
+
+    class TestFacade {
+      store = target;
+
+      @SkipIfCached('DETAIL', (i: TestFacade) => i.store)
+      loadData(id: string) {
+        methodFn(id);
+      }
+    }
+
+    source.update('DETAIL', {
+      data: { id: 'a', value: 'alpha' },
+      status: 'Success',
+      isLoading: false,
+    });
+
+    const facade = new TestFacade();
+    facade.loadData('a');
+    facade.loadData('b');
+
+    expect(methodFn).toHaveBeenCalledTimes(1);
+    expect(methodFn).toHaveBeenCalledWith('b');
+  });
+
+  it('should re-execute only invalidated mirrored keyed resource', () => {
+    interface DetailEntity {
+      id: string;
+      value: string;
+    }
+
+    type SourceData = {
+      DETAIL: ResourceState<DetailEntity>;
+    };
+
+    type TargetData = {
+      DETAIL: ResourceState<KeyedResourceData<string, DetailEntity>>;
+    };
+
+    const source = new LazyStore<SourceData>();
+    const target = new LazyStore<TargetData>();
+    const methodFn = vi.fn();
+
+    collectKeyed<SourceData, TargetData, DetailEntity>(source, 'DETAIL', target, {
+      extractId: (data) => data?.id,
+    });
+
+    class TestFacade {
+      store = target;
+
+      @SkipIfCached('DETAIL', (i: TestFacade) => i.store)
+      loadData(id: string) {
+        methodFn(id);
+      }
+    }
+
+    source.update('DETAIL', {
+      data: { id: 'a', value: 'alpha' },
+      status: 'Success',
+      isLoading: false,
+    });
+    source.update('DETAIL', {
+      data: { id: 'b', value: 'beta' },
+      status: 'Success',
+      isLoading: false,
+    });
+
+    const facade = new TestFacade();
+    facade.loadData('a');
+    facade.loadData('b');
+
+    expect(methodFn).not.toHaveBeenCalled();
+
+    source.invalidateCacheFor('DETAIL', 'a');
+
+    facade.loadData('a');
+    facade.loadData('b');
+
+    expect(methodFn).toHaveBeenCalledTimes(1);
+    expect(methodFn).toHaveBeenCalledWith('a');
   });
 });

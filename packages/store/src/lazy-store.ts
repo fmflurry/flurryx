@@ -1,10 +1,11 @@
 import { signal, type Signal, untracked, WritableSignal } from "@angular/core";
-import { type ResourceState } from "@flurryx/core";
+import { type ResourceState, type KeyedResourceKey } from "@flurryx/core";
 import type {
   IStore,
   KeyedResourceEntryKey,
   KeyedResourceEntryValue,
   KeyedStoreKey,
+  StoreCacheInvalidateEvent,
   StoreDataShape,
   StoreKey,
   StoreOptions,
@@ -38,6 +39,11 @@ type UpdateCallback = (
   previousState: ResourceState<unknown>
 ) => void;
 
+type CacheInvalidateCallback = (event: {
+  key: string;
+  resourceKey?: KeyedResourceKey;
+}) => void;
+
 /**
  * Lazy store that creates signals on first access.
  * Used by the `Store.for<Config>().build()` API where keys are
@@ -52,6 +58,10 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   >();
   private readonly signalViews = new Map<string, Signal<unknown>>();
   private readonly hooks = new Map<string, UpdateCallback[]>();
+  private readonly cacheInvalidateHooks = new Map<
+    string,
+    CacheInvalidateCallback[]
+  >();
   private readonly historyDriver: StoreHistoryDriver<TData>;
 
   /** @inheritDoc */
@@ -280,6 +290,22 @@ export class LazyStore<TData extends StoreDataShape<TData>>
   }
 
   /** @inheritDoc */
+  invalidateCacheFor<K extends StoreKey<TData>>(key: K): void;
+
+  /** @inheritDoc */
+  invalidateCacheFor<K extends StoreKey<TData>>(
+    key: K,
+    resourceKey: KeyedResourceKey
+  ): void;
+
+  invalidateCacheFor<K extends StoreKey<TData>>(
+    key: K,
+    resourceKey?: KeyedResourceKey
+  ): void {
+    this.notifyCacheInvalidateHooks(key, resourceKey);
+  }
+
+  /** @inheritDoc */
   onUpdate<K extends StoreKey<TData>>(
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void
@@ -292,6 +318,29 @@ export class LazyStore<TData extends StoreDataShape<TData>>
 
     return () => {
       const keyHooks = this.hooks.get(key);
+      if (!keyHooks) {
+        return;
+      }
+      const index = keyHooks.indexOf(typedCallback);
+      if (index > -1) {
+        keyHooks.splice(index, 1);
+      }
+    };
+  }
+
+  /** @inheritDoc */
+  onCacheInvalidate<K extends StoreKey<TData>>(
+    key: K,
+    callback: (event: StoreCacheInvalidateEvent<TData, K>) => void
+  ): () => void {
+    if (!this.cacheInvalidateHooks.has(key)) {
+      this.cacheInvalidateHooks.set(key, []);
+    }
+    const typedCallback = callback as CacheInvalidateCallback;
+    this.cacheInvalidateHooks.get(key)!.push(typedCallback);
+
+    return () => {
+      const keyHooks = this.cacheInvalidateHooks.get(key);
       if (!keyHooks) {
         return;
       }
@@ -333,6 +382,42 @@ export class LazyStore<TData extends StoreDataShape<TData>>
         throw new AggregateError(
           errors,
           `${errors.length} onUpdate hooks threw for key "${String(key)}"`
+        );
+      });
+    }
+  }
+
+  private notifyCacheInvalidateHooks<K extends StoreKey<TData>>(
+    key: K,
+    resourceKey?: KeyedResourceKey
+  ): void {
+    const keyHooks = this.cacheInvalidateHooks.get(key);
+    if (!keyHooks) {
+      return;
+    }
+
+    const event = {
+      key: String(key),
+      resourceKey,
+    };
+    const errors: unknown[] = [];
+
+    keyHooks.forEach((hook) => {
+      try {
+        hook(event);
+      } catch (error: unknown) {
+        errors.push(error);
+      }
+    });
+
+    if (errors.length > 0) {
+      queueMicrotask(() => {
+        if (errors.length === 1) {
+          throw errors[0];
+        }
+        throw new AggregateError(
+          errors,
+          `${errors.length} onCacheInvalidate hooks threw for key "${String(key)}"`
         );
       });
     }

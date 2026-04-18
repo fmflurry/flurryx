@@ -962,7 +962,7 @@ function createInterfaceBuilder<TConfig extends object>(
       return new InjectionToken("FlurryxStore", {
         providedIn: "root",
         factory: () => {
-          const store = new LazyStore(options) as IStore<AnyStoreData>;
+          const store = new LazyStore(options) as unknown as IStore<AnyStoreData>;
           wireMirrors(store, mirrors);
           wireMirrorKeyed(store, mirrorKeyedDefs);
           wireSelfMirrors(store, selfMirrors);

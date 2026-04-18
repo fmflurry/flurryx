@@ -90,6 +90,15 @@ export type StoreSignal<
   ? KeyedStoreSignal<TData, K>
   : Signal<TData[K]>;
 
+/** Cache invalidation event emitted for a store slot. */
+export interface StoreCacheInvalidateEvent<
+  TData extends StoreDataShape<TData>,
+  K extends StoreKey<TData>
+> {
+  readonly key: K;
+  readonly resourceKey: KeyedResourceKey | undefined;
+}
+
 /**
  * Phantom-typed marker for a store resource slot.
  * Carries type information at compile time with zero runtime cost.
@@ -241,6 +250,13 @@ export interface IStore<TData extends StoreDataShape<TData>> {
     key: K,
     resourceKey: KeyedResourceEntryKey<TData, K>
   ): void;
+  /** Invalidates the cache metadata for a slot. Store state is left unchanged. */
+  invalidateCacheFor<K extends StoreKey<TData>>(key: K): void;
+  /** Invalidates the cache metadata for a single resource. Store state is left unchanged. */
+  invalidateCacheFor<K extends StoreKey<TData>>(
+    key: K,
+    resourceKey: KeyedResourceKey
+  ): void;
   /**
    * Registers a callback invoked whenever the given slot changes.
    * @returns A cleanup function that removes the listener.
@@ -248,6 +264,14 @@ export interface IStore<TData extends StoreDataShape<TData>> {
   onUpdate<K extends StoreKey<TData>>(
     key: K,
     callback: (state: TData[K], previousState: TData[K]) => void
+  ): () => void;
+  /**
+   * Registers a callback invoked whenever cache metadata is invalidated for the given slot.
+   * @returns A cleanup function that removes the listener.
+   */
+  onCacheInvalidate<K extends StoreKey<TData>>(
+    key: K,
+    callback: (event: StoreCacheInvalidateEvent<TData, K>) => void
   ): () => void;
 
   /** Reactive signal containing the full history entries. */

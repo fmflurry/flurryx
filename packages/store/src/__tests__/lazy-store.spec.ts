@@ -559,5 +559,29 @@ describe("LazyStore", () => {
       store.updateKeyedOne("details", "2", { id: "2", name: "Item 2" });
       expect(detailSignal().data).toEqual({ id: "2", name: "Item 2" });
     });
+
+    it("invalidateCacheFor should notify scoped cache listeners", () => {
+      const store = new LazyStore<TestData>();
+      const keyListener = vi.fn();
+      const keyedListener = vi.fn();
+
+      const cleanupKey = store.onCacheInvalidate("items", keyListener);
+      const cleanupKeyed = store.onCacheInvalidate("details", keyedListener);
+
+      store.invalidateCacheFor("items");
+      store.invalidateCacheFor("details", "1");
+
+      expect(keyListener).toHaveBeenCalledWith({
+        key: "items",
+        resourceKey: undefined,
+      });
+      expect(keyedListener).toHaveBeenCalledWith({
+        key: "details",
+        resourceKey: "1",
+      });
+
+      cleanupKey();
+      cleanupKeyed();
+    });
   });
 });

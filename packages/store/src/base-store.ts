@@ -1,10 +1,11 @@
 import { signal, type Signal, WritableSignal } from "@angular/core";
-import { ResourceState } from "@flurryx/core";
+import { ResourceState, type KeyedResourceKey } from "@flurryx/core";
 import type {
   IStore,
   KeyedResourceEntryKey,
   KeyedResourceEntryValue,
   KeyedStoreKey,
+  StoreCacheInvalidateEvent,
   StoreDataShape,
   StoreKey,
   StoreOptions,
@@ -44,6 +45,15 @@ type UpdateHooksMap = Map<
 >;
 
 const updateHooksMap = new WeakMap<object, UpdateHooksMap>();
+
+type CacheInvalidateHooksMap = Map<
+  unknown,
+  Array<
+    (event: { key: string; resourceKey?: KeyedResourceKey }) => void
+  >
+>;
+
+const cacheInvalidateHooksMap = new WeakMap<object, CacheInvalidateHooksMap>();
 
 /**
  * Abstract base class for flurryx stores.
@@ -171,6 +181,7 @@ export abstract class BaseStore<
     this.storeKeys = Object.keys(storeEnum) as StoreKey<TData>[];
     this.initializeState();
     updateHooksMap.set(this, new Map());
+    cacheInvalidateHooksMap.set(this, new Map());
 
     const consumer = createStoreMessageConsumer<TData>(
       {
@@ -265,6 +276,34 @@ export abstract class BaseStore<
           previousState: ResourceState<unknown>
         ) => void
       );
+      if (index > -1) {
+        hooksMap.splice(index, 1);
+      }
+    };
+  }
+
+  /** @inheritDoc */
+  onCacheInvalidate<K extends StoreKey<TData>>(
+    key: K,
+    callback: (event: StoreCacheInvalidateEvent<TData, K>) => void
+  ): () => void {
+    const hooks = cacheInvalidateHooksMap.get(this)!;
+    if (!hooks.has(key)) {
+      hooks.set(key, []);
+    }
+
+    const typedCallback = callback as (
+      event: { key: string; resourceKey?: KeyedResourceKey }
+    ) => void;
+
+    hooks.get(key)!.push(typedCallback);
+
+    return () => {
+      const hooksMap = hooks.get(key);
+      if (!hooksMap) {
+        return;
+      }
+      const index = hooksMap.indexOf(typedCallback);
       if (index > -1) {
         hooksMap.splice(index, 1);
       }
@@ -377,6 +416,22 @@ export abstract class BaseStore<
     );
   }
 
+  /** @inheritDoc */
+  invalidateCacheFor<K extends StoreKey<TData>>(key: K): void;
+
+  /** @inheritDoc */
+  invalidateCacheFor<K extends StoreKey<TData>>(
+    key: K,
+    resourceKey: KeyedResourceKey
+  ): void;
+
+  invalidateCacheFor<K extends StoreKey<TData>>(
+    key: K,
+    resourceKey?: KeyedResourceKey
+  ): void {
+    this.notifyCacheInvalidateHooks(key, resourceKey);
+  }
+
   private notifyUpdateHooks<K extends StoreKey<TData>>(
     key: K,
     nextState: TData[K],
@@ -409,6 +464,43 @@ export abstract class BaseStore<
         throw new AggregateError(
           errors,
           `${errors.length} onUpdate hooks threw for key "${String(key)}"`
+        );
+      });
+    }
+  }
+
+  private notifyCacheInvalidateHooks<K extends StoreKey<TData>>(
+    key: K,
+    resourceKey?: KeyedResourceKey
+  ): void {
+    const hooks = cacheInvalidateHooksMap.get(this);
+    const keyHooks = hooks?.get(key);
+    if (!keyHooks) {
+      return;
+    }
+
+    const event = {
+      key: String(key),
+      resourceKey,
+    };
+    const errors: unknown[] = [];
+
+    keyHooks.forEach((hook) => {
+      try {
+        hook(event);
+      } catch (error: unknown) {
+        errors.push(error);
+      }
+    });
+
+    if (errors.length > 0) {
+      queueMicrotask(() => {
+        if (errors.length === 1) {
+          throw errors[0];
+        }
+        throw new AggregateError(
+          errors,
+          `${errors.length} onCacheInvalidate hooks threw for key "${String(key)}"`
         );
       });
     }

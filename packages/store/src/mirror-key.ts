@@ -1,4 +1,10 @@
+import type { KeyedResourceKey } from "@flurryx/core";
 import type { IStore, StoreDataShape, StoreKey } from "./types";
+
+interface CacheInvalidationTarget<TData extends StoreDataShape<TData>> {
+  invalidateCacheFor(key: StoreKey<TData>): void;
+  invalidateCacheFor(key: StoreKey<TData>, resourceKey: KeyedResourceKey): void;
+}
 
 /**
  * Options for {@link mirrorKey}.
@@ -39,12 +45,27 @@ export function mirrorKey<
   const resolvedOptions =
     typeof targetKeyOrOptions === "object" ? targetKeyOrOptions : options;
 
-  const cleanup = source.onUpdate(sourceKey, (state) => {
+  const updateCleanup = source.onUpdate(sourceKey, (state) => {
     target.update(
       resolvedTargetKey,
       state as unknown as Partial<TTarget[StoreKey<TTarget>]>
     );
   });
+
+  const invalidateCleanup = source.onCacheInvalidate(sourceKey, (event) => {
+    const invalidationTarget = target as unknown as CacheInvalidationTarget<TTarget>;
+    if (event.resourceKey === undefined) {
+      invalidationTarget.invalidateCacheFor(resolvedTargetKey);
+      return;
+    }
+
+    invalidationTarget.invalidateCacheFor(resolvedTargetKey, event.resourceKey);
+  });
+
+  const cleanup = () => {
+    updateCleanup();
+    invalidateCleanup();
+  };
 
   if (resolvedOptions?.destroyRef) {
     resolvedOptions.destroyRef.onDestroy(cleanup);

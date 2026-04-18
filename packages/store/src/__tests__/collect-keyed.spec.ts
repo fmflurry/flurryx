@@ -237,4 +237,23 @@ describe('collectKeyed', () => {
     expect(state.data!['c1']?.isLoading).toBe(false);
     expect(state.data!['c1']?.data).toEqual({ id: 'c1', name: 'Alice' });
   });
+
+  it('should propagate cache invalidation to target keyed cache listeners', () => {
+    const source = createSource();
+    const target = createTarget();
+    const listener = vi.fn();
+
+    collectKeyed<SourceData, TargetData, Customer>(source, 'CUSTOMER_DETAILS', target, {
+      extractId,
+    });
+
+    target.onCacheInvalidate('CUSTOMER_DETAILS', listener);
+
+    source.invalidateCacheFor('CUSTOMER_DETAILS', 'c1');
+
+    expect(listener).toHaveBeenCalledWith({
+      key: 'CUSTOMER_DETAILS',
+      resourceKey: 'c1',
+    });
+  });
 });

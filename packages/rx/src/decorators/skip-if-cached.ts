@@ -14,6 +14,17 @@ import type {
 
 type StoreWithSignal<TKey extends StoreEnum> = {
   get: (key: TKey) => Signal<ResourceState<unknown>> | undefined;
+  onUpdate?: (
+    key: TKey,
+    callback: (
+      state: ResourceState<unknown>,
+      previousState: ResourceState<unknown>
+    ) => void
+  ) => () => void;
+  onCacheInvalidate?: (
+    key: TKey,
+    callback: (event: { key: TKey; resourceKey?: KeyedResourceKey }) => void
+  ) => () => void;
 };
 
 interface CacheEntry {
@@ -26,6 +37,18 @@ const cacheState = new WeakMap<
   object,
   Map<StoreEnum, Map<string, CacheEntry>>
 >();
+
+const keyedCacheIndex = new WeakMap<
+  object,
+  Map<StoreEnum, Map<string, Set<string>>>
+>();
+
+const cacheKeyOwners = new WeakMap<
+  object,
+  Map<StoreEnum, Map<string, string>>
+>();
+
+const storeSyncRegistry = new WeakMap<object, Set<StoreEnum>>();
 
 function getStoreKeyMap(
   store: object,
@@ -54,13 +77,97 @@ function getCacheEntry(
   return getStoreKeyMap(store, key).get(cacheKey);
 }
 
+function getKeyedCacheIndexMap(
+  store: object,
+  key: StoreEnum
+): Map<string, Set<string>> {
+  let storeMap = keyedCacheIndex.get(store);
+  if (!storeMap) {
+    storeMap = new Map();
+    keyedCacheIndex.set(store, storeMap);
+  }
+
+  let keyMap = storeMap.get(key);
+  if (!keyMap) {
+    keyMap = new Map();
+    storeMap.set(key, keyMap);
+  }
+
+  return keyMap;
+}
+
+function getCacheKeyOwnersMap(
+  store: object,
+  key: StoreEnum
+): Map<string, string> {
+  let storeMap = cacheKeyOwners.get(store);
+  if (!storeMap) {
+    storeMap = new Map();
+    cacheKeyOwners.set(store, storeMap);
+  }
+
+  let keyMap = storeMap.get(key);
+  if (!keyMap) {
+    keyMap = new Map();
+    storeMap.set(key, keyMap);
+  }
+
+  return keyMap;
+}
+
+function toResourceIndexKey(resourceKey: KeyedResourceKey): string {
+  return String(resourceKey);
+}
+
+function trackKeyedCacheEntry(
+  store: object,
+  key: StoreEnum,
+  resourceKey: KeyedResourceKey,
+  cacheKey: string
+): void {
+  const resourceIndexKey = toResourceIndexKey(resourceKey);
+  const keyedIndexMap = getKeyedCacheIndexMap(store, key);
+  const existingKeys = keyedIndexMap.get(resourceIndexKey) ?? new Set<string>();
+  existingKeys.add(cacheKey);
+  keyedIndexMap.set(resourceIndexKey, existingKeys);
+  getCacheKeyOwnersMap(store, key).set(cacheKey, resourceIndexKey);
+}
+
+function untrackKeyedCacheEntry(
+  store: object,
+  key: StoreEnum,
+  cacheKey: string
+): void {
+  const ownersMap = getCacheKeyOwnersMap(store, key);
+  const resourceIndexKey = ownersMap.get(cacheKey);
+  if (!resourceIndexKey) {
+    return;
+  }
+
+  ownersMap.delete(cacheKey);
+  const keyedIndexMap = getKeyedCacheIndexMap(store, key);
+  const existingKeys = keyedIndexMap.get(resourceIndexKey);
+  if (!existingKeys) {
+    return;
+  }
+
+  existingKeys.delete(cacheKey);
+  if (existingKeys.size === 0) {
+    keyedIndexMap.delete(resourceIndexKey);
+  }
+}
+
 function setCacheEntry(
   store: object,
   key: StoreEnum,
   cacheKey: string,
-  entry: CacheEntry
+  entry: CacheEntry,
+  resourceKey?: KeyedResourceKey
 ): void {
   getStoreKeyMap(store, key).set(cacheKey, entry);
+  if (resourceKey !== undefined) {
+    trackKeyedCacheEntry(store, key, resourceKey, cacheKey);
+  }
 }
 
 function clearCacheEntry(
@@ -69,6 +176,32 @@ function clearCacheEntry(
   cacheKey: string
 ): void {
   getStoreKeyMap(store, key).delete(cacheKey);
+  untrackKeyedCacheEntry(store, key, cacheKey);
+}
+
+function clearAllCacheEntries(store: object, key: StoreEnum): void {
+  cacheState.get(store)?.delete(key);
+  keyedCacheIndex.get(store)?.delete(key);
+  cacheKeyOwners.get(store)?.delete(key);
+}
+
+function clearKeyedCacheEntries(
+  store: object,
+  key: StoreEnum,
+  resourceKey: KeyedResourceKey
+): void {
+  const resourceIndexKey = toResourceIndexKey(resourceKey);
+  const keyedIndexMap = getKeyedCacheIndexMap(store, key);
+  const cacheKeys = keyedIndexMap.get(resourceIndexKey);
+  if (!cacheKeys) {
+    return;
+  }
+
+  cacheKeys.forEach((cacheKey) => {
+    getStoreKeyMap(store, key).delete(cacheKey);
+    getCacheKeyOwnersMap(store, key).delete(cacheKey);
+  });
+  keyedIndexMap.delete(resourceIndexKey);
 }
 
 function deriveResourceKey(args: unknown[]): KeyedResourceKey | undefined {
@@ -91,6 +224,110 @@ function isExpired(
     return false;
   }
   return now - timestamp >= timeoutMs;
+}
+
+function getSeedCacheKeys(resourceKey: string): string[] {
+  const seedKeys = [JSON.stringify([resourceKey])];
+  const numericResourceKey = Number(resourceKey);
+
+  if (
+    Number.isFinite(numericResourceKey) &&
+    String(numericResourceKey) === resourceKey
+  ) {
+    seedKeys.push(JSON.stringify([numericResourceKey]));
+  }
+
+  return seedKeys;
+}
+
+function syncKeyedCacheFromState(
+  store: object,
+  storeKey: StoreEnum,
+  currentState: ResourceState<unknown>,
+  previousState?: ResourceState<unknown>
+): void {
+  const currentKeyed = isKeyedResourceData(currentState.data)
+    ? currentState.data
+    : undefined;
+  const previousKeyed =
+    previousState && isKeyedResourceData(previousState.data)
+      ? previousState.data
+      : undefined;
+
+  if (!currentKeyed && !previousKeyed) {
+    return;
+  }
+
+  const currentRecord = currentKeyed
+    ? toKeyedResourceRecord(currentKeyed)
+    : undefined;
+  const previousRecord = previousKeyed
+    ? toKeyedResourceRecord(previousKeyed)
+    : undefined;
+  const resourceKeys = new Set<string>([
+    ...Object.keys(previousRecord ?? {}),
+    ...Object.keys(currentRecord ?? {}),
+  ]);
+  const now = Date.now();
+
+  resourceKeys.forEach((resourceKey) => {
+    const nextEntry = currentRecord?.[resourceKey];
+
+    if (!nextEntry || nextEntry.status === "Error") {
+      clearKeyedCacheEntries(store, storeKey, resourceKey);
+      return;
+    }
+
+    const shouldSeed =
+      (nextEntry.status === "Success" && nextEntry.data !== undefined) ||
+      nextEntry.isLoading === true;
+
+    if (!shouldSeed) {
+      return;
+    }
+
+    getSeedCacheKeys(resourceKey).forEach((cacheKey) => {
+      setCacheEntry(
+        store,
+        storeKey,
+        cacheKey,
+        {
+          timestamp: now,
+          args: cacheKey,
+        },
+        resourceKey
+      );
+    });
+  });
+}
+
+function ensureStoreCacheSync<TKey extends StoreEnum>(
+  store: StoreWithSignal<TKey>,
+  storeKey: TKey,
+  currentState: ResourceState<unknown>
+): void {
+  const syncedKeys = storeSyncRegistry.get(store as object) ?? new Set<StoreEnum>();
+  if (syncedKeys.has(storeKey)) {
+    return;
+  }
+
+  syncedKeys.add(storeKey);
+  storeSyncRegistry.set(store as object, syncedKeys);
+
+  store.onUpdate?.(storeKey, (state, previousState) => {
+    syncKeyedCacheFromState(store as object, storeKey, state, previousState);
+  });
+
+  store.onCacheInvalidate?.(storeKey, (event) => {
+    if (event.resourceKey === undefined) {
+      clearAllCacheEntries(store as object, storeKey);
+      return;
+    }
+
+    clearKeyedCacheEntries(store as object, storeKey, event.resourceKey);
+  });
+
+  syncKeyedCacheFromState(store as object, storeKey, currentState);
 }
 
 interface StoreContext {
@@ -202,7 +439,12 @@ function handleKeyedCache(
   now: number,
   returnObservable: boolean
 ): CacheHitResult {
-  const { keyedData, resourceKey, keyedCacheEntry, runtimeCacheKey } = context;
+  const {
+    keyedData,
+    resourceKey,
+    keyedCacheEntry,
+    runtimeCacheKey,
+  } = context;
 
   if (!keyedData || resourceKey === undefined) {
     return { hit: false };
@@ -218,7 +460,12 @@ function handleKeyedCache(
     clearCacheEntry(store, storeKey, runtimeCacheKey);
   }
 
-  if (!expired && status === "Success" && entity !== undefined) {
+  const hasValidCacheEntry =
+    keyedCacheEntry !== undefined &&
+    keyedCacheEntry.args === runtimeCacheKey &&
+    !expired;
+
+  if (hasValidCacheEntry && status === "Success" && entity !== undefined) {
     if (returnObservable) {
       return { hit: true, value: of(entity) };
     }
@@ -226,10 +473,10 @@ function handleKeyedCache(
   }
 
   if (returnObservable) {
-    if (keyedCacheEntry?.inflight$) {
+    if (hasValidCacheEntry && keyedCacheEntry.inflight$) {
       return { hit: true, value: keyedCacheEntry.inflight$ };
     }
-  } else if (loading) {
+  } else if (hasValidCacheEntry && loading) {
     return { hit: true };
   }
 
@@ -386,6 +633,7 @@ export function SkipIfCached<TTarget, TKey extends StoreEnum>(
         return originalMethod.apply(this, args);
       }
       const { store, storeSignal, currentState } = storeContext;
+      ensureStoreCacheSync(store as StoreWithSignal<TKey>, storeKey, currentState);
 
       const argsString = JSON.stringify(args);
       const now = Date.now();
@@ -429,10 +677,16 @@ export function SkipIfCached<TTarget, TKey extends StoreEnum>(
       const result = originalMethod.apply(this, args);
 
       if (!returnObservable) {
-        setCacheEntry(store, storeKey, cacheContext.runtimeCacheKey, {
-          timestamp: now,
-          args: argsString,
-        });
+        setCacheEntry(
+          store,
+          storeKey,
+          cacheContext.runtimeCacheKey,
+          {
+            timestamp: now,
+            args: argsString,
+          },
+          cacheContext.resourceKey
+        );
         return result;
       }
 
@@ -444,11 +698,17 @@ export function SkipIfCached<TTarget, TKey extends StoreEnum>(
         argsString
       );
 
-      setCacheEntry(store, storeKey, cacheContext.runtimeCacheKey, {
-        timestamp: now,
-        args: argsString,
-        inflight$,
-      });
+      setCacheEntry(
+        store,
+        storeKey,
+        cacheContext.runtimeCacheKey,
+        {
+          timestamp: now,
+          args: argsString,
+          inflight$,
+        },
+        cacheContext.resourceKey
+      );
 
       return inflight$;
     };

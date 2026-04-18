@@ -600,5 +600,31 @@ describe("BaseStore", () => {
       expect(cb).toHaveBeenCalledTimes(1);
       cleanup();
     });
+
+    it("invalidateCacheFor should notify scoped cache listeners", () => {
+      const keyListener = vi.fn();
+      const keyedListener = vi.fn();
+
+      const cleanupKey = store.onCacheInvalidate(TestStoreEnum.ITEM_ONE, keyListener);
+      const cleanupKeyed = store.onCacheInvalidate(
+        TestStoreEnum.ITEM_THREE,
+        keyedListener
+      );
+
+      store.invalidateCacheFor(TestStoreEnum.ITEM_ONE);
+      store.invalidateCacheFor(TestStoreEnum.ITEM_THREE, "1");
+
+      expect(keyListener).toHaveBeenCalledWith({
+        key: TestStoreEnum.ITEM_ONE,
+        resourceKey: undefined,
+      });
+      expect(keyedListener).toHaveBeenCalledWith({
+        key: TestStoreEnum.ITEM_THREE,
+        resourceKey: "1",
+      });
+
+      cleanupKey();
+      cleanupKeyed();
+    });
   });
 });

@@ -1,5 +1,15 @@
 # @flurryx/store
 
+## 1.3.3
+
+### Patch Changes
+
+- Fix `LazyStore.get()` throwing Angular NG0600 when invoked inside a
+  `computed` or `effect`. The first call materialises the slot and used
+  to update the internal `keysSignal`, which Angular flagged as a write
+  inside the caller's reactive context. The bookkeeping write is now
+  wrapped in `untracked` so it stays an internal side-effect.
+
 ## 1.3.2
 
 ### Patch Changes

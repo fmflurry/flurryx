@@ -30,6 +30,10 @@ export function computed<T>(fn: () => T): Signal<T> {
   return (() => fn()) as Signal<T>;
 }
 
+export function untracked<T>(fn: () => T): T {
+  return fn();
+}
+
 export class InjectionToken<T> {
   constructor(
     public readonly description: string,

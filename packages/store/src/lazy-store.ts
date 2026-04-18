@@ -1,4 +1,4 @@
-import { signal, type Signal, WritableSignal } from "@angular/core";
+import { signal, type Signal, untracked, WritableSignal } from "@angular/core";
 import { type ResourceState } from "@flurryx/core";
 import type {
   IStore,
@@ -187,7 +187,12 @@ export class LazyStore<TData extends StoreDataShape<TData>>
     if (!sig) {
       sig = signal<ResourceState<unknown>>(createDefaultState());
       this.signals.set(key, sig);
-      this.keysSignal.update((prev) => [...prev, key]);
+      // The lazy key-registry bookkeeping is a side-effect of materialising
+      // the slot, not of the caller's read. If `get()` is invoked inside a
+      // `computed`/`effect`, letting the write escape that reactive context
+      // triggers Angular's NG0600 guard. Wrap it in `untracked` so the
+      // caller's reactive context stays clean.
+      untracked(() => this.keysSignal.update((prev) => [...prev, key]));
     }
     return sig as WritableSignal<TData[K]>;
   }

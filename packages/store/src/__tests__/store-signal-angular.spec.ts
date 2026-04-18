@@ -62,4 +62,15 @@ describe("store signal Angular interop", () => {
       errors: undefined,
     });
   });
+
+  it("LazyStore get() should not throw NG0600 when invoked inside computed", () => {
+    const store = new LazyStore<LazyStoreData>();
+
+    // Materialising the slot must not leak a signal write into the caller's
+    // reactive context, otherwise Angular guards the computed with NG0600.
+    const state = computed(() => store.get("item")());
+
+    expect(() => state()).not.toThrow();
+    expect(state().data).toBeUndefined();
+  });
 });

@@ -497,7 +497,7 @@ Once injected, the store exposes these methods:
 | `clear(key)`              | Resets a slot to its initial empty state                                              |
 | `clearAll()`              | Resets every slot                                                                     |
 | `startLoading(key)`       | Sets `isLoading: true`, clears `status` and `errors`                                  |
-| `stopLoading(key)`        | Sets `isLoading: false`, clears `status` and `errors`                                 |
+| `stopLoading(key)`        | Sets `isLoading: false`                                                                |
 | `onUpdate(key, callback)` | Registers a listener fired after `update` or `clear`. Returns an unsubscribe function |
 
 **Keyed methods** (for `KeyedResourceData` slots):
@@ -622,6 +622,8 @@ this.http
 
 Only the targeted resource key is updated. Other keys in the same slot are untouched.
 
+On subscribe, keyed slot is bootstrapped immediately so per-key loading state exists before first response. Top-level `isLoading` reflects whether any keyed entry is still loading.
+
 **`mapResponse`** — transform the API response before writing to the store:
 
 ```typescript
@@ -668,7 +670,7 @@ loadProducts() { /* only runs when cache is stale */ }
 - Cache hit returns `of(cachedData)` or coalesces onto the in-flight `Observable` via `shareReplay`
 - Cache miss executes the method and wraps the result with inflight tracking
 
-**Keyed resources**: When the first argument is a `string | number` and the store data is a `KeyedResourceData`, cache entries are tracked per resource key automatically.
+**Keyed resources**: When the first argument is a `string | number` and the store data is a `KeyedResourceData`, cache entries are tracked per resource key automatically. Invalidating or clearing one keyed entry only evicts cache metadata for that same `resourceKey`.
 
 ### @Loading
 
@@ -763,6 +765,8 @@ Each resource key gets **independent** loading, status, and error tracking. The 
 
 On first keyed fetch, `syncToKeyedStore(..., id)` now bootstraps keyed slot immediately on subscribe. That means `data?.[id]?.isLoading` becomes `true` before first response arrives, without manually seeding `createKeyedResourceData()`.
 
+For Angular-safe reactive reads, prefer `store.get('ITEMS').for(id)`. `.for(...)` is a pure computed read, accepts either a raw key or a signal key, and is safe to call inside `computed()`.
+
 **Full example:**
 
 ```typescript
@@ -780,6 +784,7 @@ export class InvoiceFacade {
   private readonly http = inject(HttpClient);
   readonly store = inject(InvoiceStore);
   readonly items = this.store.get("ITEMS");
+  readonly invoiceState = this.items.for("inv-123");
 
   @SkipIfCached("ITEMS", (i: InvoiceFacade) => i.store)
   @Loading("ITEMS", (i: InvoiceFacade) => i.store)
@@ -796,6 +801,11 @@ const data = this.facade.items().data; // KeyedResourceData
 const invoice = data?.["inv-123"]?.data; // Invoice | undefined
 const loading = data?.["inv-123"]?.isLoading; // boolean | undefined
 const errors = data?.["inv-123"]?.errors; // ResourceErrors | undefined
+
+// Preferred reactive read API
+const invoiceState = this.facade.invoiceState();
+const reactiveInvoice = invoiceState.data; // Invoice | undefined
+const reactiveLoading = invoiceState.isLoading; // boolean
 ```
 
 **Utilities:**
@@ -1147,12 +1157,12 @@ When building session or aggregation stores that combine state from multiple fea
 ```
 +--------------------+                    +--------------------+
 | Feature Store A    |                    |                    |
-| (CUSTOMERS)        |-- mirrorKey ------>|                    |
+| (CUSTOMERS)        |<- mirrorKey ----->|                    |
 +--------------------+                    |                    |
                                           |  Session Store     |
 +--------------------+                    |  (aggregated)      |
 | Feature Store B    |                    |                    |
-| (ORDERS)           |-- mirrorKey ------>|  CUSTOMERS      +  |
+| (ORDERS)           |<- mirrorKey ----->|  CUSTOMERS      +  |
 +--------------------+                    |  ORDERS         +  |
                                           |  CUSTOMER_CACHE +  |
 +--------------------+                    |  ORDER_CACHE    +  |
@@ -1424,36 +1434,37 @@ Each entity fetched through the source slot is accumulated by ID into the target
 
 ### mirrorKey
 
-Mirrors a resource key from one store to another. When the source updates, the target is updated with the same state.
+Mirrors a resource key **bidirectionally** by default between two stores. When either side updates — data, loading, errors — the other receives the same state. A guard flag prevents infinite update loops. Set `direction: 'source-to-target'` for one-way mirroring.
 
 ```
 +------------------+--------------------------------+------------------+
 | CustomerStore    |          mirrorKey             | SessionStore     |
 |                  |                                |                  |
-| CUSTOMERS -------|--- onUpdate --> update ------->| CUSTOMERS        |
-|                  |   (same key or different)      |                  |
+| CUSTOMERS -------|<-- onUpdate --> update ------>| CUSTOMERS        |
+|                  |   (bidirectional by default)   |                  |
 | { data,          |                                | { data,          |
 |   status,        |                                |   status,        |
 |   isLoading }    |                                |   isLoading }    |
 +------------------+--------------------------------+------------------+
 
-source.update('CUSTOMERS', { data: [...], status: 'Success' })
-     |
-     '--> target is automatically updated with the same state
+Either side can update — the other side follows automatically.
 ```
 
-You wire it once. Every future update — data, loading, errors — flows automatically. Call the cleanup function or use `destroyRef` to stop.
+You wire it once. Every future update — data, loading, errors — flows in both directions. Call the cleanup function or use `destroyRef` to stop.
 
 ```typescript
-// Same key on both stores (default)
+// Same key on both stores (bidirectional by default)
 mirrorKey(customersStore, "CUSTOMERS", sessionStore);
 
-// Different keys
+// Different keys — still bidirectional
 mirrorKey(customersStore, "ITEMS", sessionStore, "ARTICLES");
+
+// One-way only (source → target)
+mirrorKey(customersStore, "CUSTOMERS", sessionStore, { direction: "source-to-target" });
 
 // Manual cleanup
 const cleanup = mirrorKey(customersStore, "CUSTOMERS", sessionStore);
-cleanup(); // stop mirroring
+cleanup(); // stop mirroring in both directions
 
 // Auto-cleanup with Angular DestroyRef
 mirrorKey(customersStore, "CUSTOMERS", sessionStore, { destroyRef });

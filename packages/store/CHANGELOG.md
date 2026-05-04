@@ -1,5 +1,11 @@
 # @flurryx/store
 
+## 1.3.5
+
+### Patch Changes
+
+- mirrorKey now bidirectional by default with `direction` option to control behavior
+
 ## 1.3.3
 
 ### Patch Changes

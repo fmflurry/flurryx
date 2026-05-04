@@ -1,5 +1,12 @@
 # @flurryx/rx
 
+## 1.3.5
+
+### Patch Changes
+
+- Updated dependencies
+  - @flurryx/store@1.3.5
+
 ## 1.3.3
 
 ### Patch Changes

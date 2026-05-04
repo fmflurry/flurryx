@@ -286,7 +286,9 @@ Calls `startLoading(key)` before method. If first arg is `string|number` and sto
 
 ```ts
 mirrorKey(sourceStore, sourceKey, targetStore, targetKey?, options?: MirrorOptions)
-// MirrorOptions: { destroyRef?: { onDestroy(fn) } }
+// MirrorOptions: { destroyRef?, direction?: 'bidirectional' | 'source-to-target' }
+// Default direction: 'bidirectional' — updates flow both ways with loop guard.
+// Set direction: 'source-to-target' for one-way mirroring.
 // returns cleanup () => void
 ```
 

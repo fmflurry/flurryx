@@ -15,17 +15,28 @@ export interface MirrorOptions {
    * automatic cleanup. When provided, the mirror stops when the ref is destroyed.
    */
   destroyRef?: { onDestroy: (fn: () => void) => void };
+
+  /**
+   * Mirrors updates in both directions by default (`bidirectional`).
+   * Set to `source-to-target` for one-way mirroring (source → target only).
+   *
+   * @default "bidirectional"
+   */
+  direction?: "source-to-target" | "bidirectional";
 }
 
 /**
- * Mirrors a resource key from a source store to a target store.
- * When the source key updates, the target key is updated with the same state.
+ * Mirrors a resource key between two stores. Bidirectional by default —
+ * when either side updates, the other receives the same state.
+ * A guard flag prevents infinite update loops.
+ *
+ * Set `options.direction` to `"source-to-target"` for one-way mirroring.
  *
  * @param source - The store to mirror from
  * @param sourceKey - The key to watch on the source store
  * @param target - The store to mirror to
  * @param targetKeyOrOptions - Either the target key name or options (defaults source key)
- * @param options - Mirror options when a target key is provided
+ * @param options - Mirror options (direction, destroyRef)
  * @returns Cleanup function to stop mirroring
  */
 export function mirrorKey<
@@ -45,26 +56,78 @@ export function mirrorKey<
   const resolvedOptions =
     typeof targetKeyOrOptions === "object" ? targetKeyOrOptions : options;
 
+  const direction = resolvedOptions?.direction ?? "bidirectional";
+
+  let forwarding = false;
+
+  // source → target (always)
   const updateCleanup = source.onUpdate(sourceKey, (state) => {
-    target.update(
-      resolvedTargetKey,
-      state as unknown as Partial<TTarget[StoreKey<TTarget>]>
-    );
+    if (forwarding) return;
+    if (direction === "bidirectional") forwarding = true;
+    try {
+      target.update(
+        resolvedTargetKey,
+        state as unknown as Partial<TTarget[StoreKey<TTarget>]>
+      );
+    } finally {
+      if (direction === "bidirectional") forwarding = false;
+    }
   });
 
   const invalidateCleanup = source.onCacheInvalidate(sourceKey, (event) => {
-    const invalidationTarget = target as unknown as CacheInvalidationTarget<TTarget>;
-    if (event.resourceKey === undefined) {
-      invalidationTarget.invalidateCacheFor(resolvedTargetKey);
-      return;
+    if (forwarding) return;
+    if (direction === "bidirectional") forwarding = true;
+    try {
+      const invalidationTarget = target as unknown as CacheInvalidationTarget<TTarget>;
+      if (event.resourceKey === undefined) {
+        invalidationTarget.invalidateCacheFor(resolvedTargetKey);
+        return;
+      }
+      invalidationTarget.invalidateCacheFor(resolvedTargetKey, event.resourceKey);
+    } finally {
+      if (direction === "bidirectional") forwarding = false;
     }
-
-    invalidationTarget.invalidateCacheFor(resolvedTargetKey, event.resourceKey);
   });
+
+  // target → source (bidirectional only)
+  let reverseUpdateCleanup: (() => void) | undefined;
+  let reverseInvalidateCleanup: (() => void) | undefined;
+
+  if (direction === "bidirectional") {
+    reverseUpdateCleanup = target.onUpdate(resolvedTargetKey, (state) => {
+      if (forwarding) return;
+      forwarding = true;
+      try {
+        source.update(
+          sourceKey,
+          state as unknown as Partial<TSource[StoreKey<TSource>]>
+        );
+      } finally {
+        forwarding = false;
+      }
+    });
+
+    reverseInvalidateCleanup = target.onCacheInvalidate(resolvedTargetKey, (event) => {
+      if (forwarding) return;
+      forwarding = true;
+      try {
+        const invalidationTarget = source as unknown as CacheInvalidationTarget<TSource>;
+        if (event.resourceKey === undefined) {
+          invalidationTarget.invalidateCacheFor(sourceKey);
+          return;
+        }
+        invalidationTarget.invalidateCacheFor(sourceKey, event.resourceKey);
+      } finally {
+        forwarding = false;
+      }
+    });
+  }
 
   const cleanup = () => {
     updateCleanup();
     invalidateCleanup();
+    reverseUpdateCleanup?.();
+    reverseInvalidateCleanup?.();
   };
 
   if (resolvedOptions?.destroyRef) {

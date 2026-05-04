@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] — 2026-04-18
+
+### Added
+
+- **Extended keyed resource state support** — umbrella exports now include keyed store signal typings and related message types used by per-entity state flows.
+
+### Fixed
+
+- **Keyed signal safety in Angular reactive contexts** — `LazyStore.get()` and keyed `.for(...)` reads no longer trigger Angular NG0600 when first accessed inside `computed()`.
+
+### Changed
+
+- **Keyed resource reads** — `store.get(key).for(resourceKey)` is now the documented pure read path for reactive per-entity access, including signal-backed keys.
+
+## [1.3.3] — 2026-04-17
+
+### Changed
+
+- **Keyed slots modeled as resource states** — keyed store data now uses `Partial<Record<TKey, ResourceState<TValue>>>`, so each entity keeps its own `data`, `isLoading`, `status`, and `errors` while the top-level slot still reflects aggregate loading.
+
+## [1.3.2] — 2026-04-17
+
+### Added
+
+- **Pure keyed read API** — published `store.get(key).for(resourceKey)` for read-only per-entity access, including support for signal-backed resource keys.
+
+### Changed
+
+- **Keyed loading initialization** — `syncToKeyedStore(..., resourceKey)` now bootstraps keyed loading state on subscribe so per-key `isLoading` is available before first response.
+
 ## [1.0.1] — 2026-04-08
 
 ### Added

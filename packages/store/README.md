@@ -52,9 +52,9 @@ export const MyStore = Store.for(Enum)
 | `update(key, partial)` | Merges partial state (immutable spread) |
 | `clear(key)` | Resets a slot to its initial empty state |
 | `clearAll()` | Resets every slot in one store |
-| `clearAllStores()` | Resets every tracked store instance |
+| `clearAllStores()` | Exported helper that resets every tracked store instance |
 | `startLoading(key)` | Sets `isLoading: true`, clears `status` and `errors` |
-| `stopLoading(key)` | Sets `isLoading: false`, clears `status` and `errors` |
+| `stopLoading(key)` | Sets `isLoading: false` |
 | `onUpdate(key, callback)` | Registers a listener fired after `update` or `clear`. Returns an unsubscribe function |
 
 ### Keyed operations
@@ -68,10 +68,13 @@ When keyed fetches use `syncToKeyedStore(..., resourceKey)`, keyed slot is boots
 | `updateKeyedOne(key, resourceKey, entity)` | Merges one entity into a keyed slot |
 | `clearKeyedOne(key, resourceKey)` | Removes one entity from a keyed slot |
 | `startKeyedLoading(key, resourceKey)` | Sets loading for a single resource key |
+| `invalidateCacheFor(key, resourceKey?)` | Evicts cache metadata for one slot or one keyed entry |
 
 ### Read-only signals
 
 `get(key)` returns a **read-only `Signal`**, not a `WritableSignal`. Consumers can read state but cannot mutate it directly — all writes must go through the store's own methods (`update`, `clear`, `startLoading`, …). This enforces strict encapsulation: the store is the single owner of its state, and external code can only observe it.
+
+When a slot holds `KeyedResourceData`, `get(key).for(resourceKey)` returns a read-only `Signal<ResourceState<TEntity>>` for one keyed entry. `.for(...)` accepts either a raw key or a signal key and is safe inside Angular `computed()` because it is a pure read.
 
 ## Clearing Store Data
 
@@ -102,6 +105,8 @@ logout() {
 }
 ```
 
+`clearAllStores` is exported helper from `@flurryx/store`, not store instance method.
+
 ### Per-key clearing for keyed resources
 
 When a slot holds a `KeyedResourceData`, `clear('ITEMS')` wipes **every** cached entity. To invalidate a single entry, use `clearKeyedOne`:
@@ -123,6 +128,9 @@ const store = inject(InvoiceStore);
 // Remove only invoice "inv-42" from the cache.
 // All other cached invoices remain untouched.
 store.clearKeyedOne('ITEMS', 'inv-42');
+
+// Evict decorator cache metadata for one keyed entry without mutating store data.
+store.invalidateCacheFor('ITEMS', 'inv-42');
 ```
 
 `clearKeyedOne` removes the entity, its loading flag, status, and errors for that key, then recalculates the top-level `isLoading` based on remaining keys.
@@ -152,6 +160,7 @@ export class InvoiceFacade {
 | `clearAll()` | Every slot in one store | Reset one feature store |
 | `clearAllStores()` | Every tracked store instance | Logout, tenant switch, full app cache reset |
 | `clearKeyedOne(key, resourceKey)` | Single entity in a keyed slot | Deleting or invalidating one cached item |
+| `invalidateCacheFor(key, resourceKey?)` | Cache metadata only | Force refetch while keeping current state snapshot |
 
 ## Store Composition
 
